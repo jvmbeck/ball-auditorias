@@ -1,7 +1,6 @@
 import { db, storage } from 'boot/firebase';
 import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { createAuditResults } from './auditResults';
-import { updateFactoryStats } from './factory';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type {
   AuditDocument,
@@ -166,7 +165,4 @@ export async function completeAudit(auditId: string): Promise<void> {
   // Write one flat analytics document per process to the `auditResults` collection.
   // These denormalized records make it cheap to query failures by process or time.
   await createAuditResults(auditId, audit);
-
-  // Atomically update the single-plant aggregation counters used for analytics dashboards.
-  await updateFactoryStats(audit, failedProcesses);
 }

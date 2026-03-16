@@ -31,15 +31,6 @@ export interface AuditDocument {
   hasFailures?: boolean;
 }
 
-/** Read-side shape for a factory-level aggregation document in `factoryStats`. */
-export interface FactoryStats {
-  totalAudits: number;
-  totalProcessesChecked: number;
-  totalFailures: number;
-  lastAuditAt: Timestamp;
-  processFailures: Record<AuditProcessKey, number>;
-}
-
 /** Write-side shape for a single analytics record in the `auditResults` collection. */
 export interface AuditResultDocument {
   auditId: string;

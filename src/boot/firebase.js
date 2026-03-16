@@ -3,6 +3,7 @@ import { boot } from 'quasar/wrappers';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { useAuthStore } from 'stores/auth.store';
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -25,6 +26,7 @@ const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const AUTH_LISTENER_UNSUBSCRIBE_KEY = '__authFirebaseListenerUnsubscribe__';
 const AUTH_LISTENER_ID_KEY = '__authFirebaseListenerId__';
@@ -40,7 +42,7 @@ const logAuth = (...messages) => {
   console.info('[auth]', ...messages);
 };
 
-export { auth, db, authReady };
+export { auth, db, storage, authReady };
 
 export default boot(() => {
   const authStore = useAuthStore();

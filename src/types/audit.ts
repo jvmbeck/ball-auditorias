@@ -52,6 +52,20 @@ export interface FailuresOverTimeData {
   countsByDate: Record<string, number>;
 }
 
+export interface FailuresByProcessData {
+  labels: string[];
+  data: number[];
+  countsByProcess: Record<string, number>;
+  mostProblematicProcess: string | null;
+}
+
+export interface ProcessFailureRatesData {
+  labels: string[];
+  data: number[];
+  totalsByProcess: Record<string, number>;
+  failuresByProcess: Record<string, number>;
+}
+
 /** Write-side shape for a single analytics record in the `auditResults` collection. */
 export interface AuditResultDocument {
   auditId: string;
@@ -60,6 +74,7 @@ export interface AuditResultDocument {
   dayOfWeek: string;
   yearMonth: string;
   date: string;
+  process: string;
   processKey: string;
   status: UpdatableProcessStatus;
   hasIssue: boolean;

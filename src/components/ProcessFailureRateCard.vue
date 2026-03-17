@@ -1,8 +1,8 @@
 <template>
-  <q-card flat bordered class="failures-card">
+  <q-card flat bordered class="failure-rate-card">
     <q-card-section>
-      <p class="eyebrow">Dashboard</p>
-      <h2 class="title">Failures Over Time</h2>
+      <p class="eyebrow">Reliability</p>
+      <h2 class="title">Process Failure Rate</h2>
       <p class="subtitle">Last 30 days</p>
     </q-card-section>
 
@@ -11,7 +11,7 @@
     <q-card-section>
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="40px" />
-        <p class="state-text">Loading failure trend...</p>
+        <p class="state-text">Loading process reliability...</p>
       </div>
 
       <div v-else-if="error" class="state-box">
@@ -19,9 +19,9 @@
         <p class="state-text">{{ error }}</p>
       </div>
 
-      <div v-else-if="!hasAnyFailures" class="state-box">
-        <q-icon name="insights" color="positive" size="28px" />
-        <p class="state-text">No failures detected in the selected period.</p>
+      <div v-else-if="!chartState.labels.length" class="state-box">
+        <q-icon name="check_circle" color="positive" size="28px" />
+        <p class="state-text">No process executions found in the selected period.</p>
       </div>
 
       <VChart v-else autoresize :option="chartOption" class="chart" />
@@ -34,46 +34,62 @@ import { computed, onMounted, provide } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
-import { LineChart } from 'echarts/charts';
+import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
+use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 provide(THEME_KEY, 'light');
 
 const analyticsStore = useAnalyticsStore();
-const loading = computed(() => analyticsStore.overTimeLoading);
-const error = computed(() => analyticsStore.overTimeError);
-const chartState = computed(() => analyticsStore.failuresOverTime);
+const loading = computed(() => analyticsStore.processFailureRateLoading);
+const error = computed(() => analyticsStore.processFailureRateError);
+const chartState = computed(() => analyticsStore.processFailureRates);
 
-const hasAnyFailures = computed(() => chartState.value.data.some((value) => value > 0));
+function getSeverityColor(rate: number): string {
+  if (rate >= 40) {
+    return '#d64545';
+  }
+
+  if (rate >= 20) {
+    return '#f4b400';
+  }
+
+  return '#2e7d32';
+}
 
 const chartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
+    axisPointer: {
+      type: 'shadow',
+    },
+    valueFormatter: (value: number) => `${value}%`,
   },
   grid: {
-    left: 16,
+    left: 10,
     right: 16,
     top: 16,
-    bottom: 30,
+    bottom: 40,
     containLabel: true,
   },
   xAxis: {
     type: 'category',
-    boundaryGap: false,
     data: chartState.value.labels,
     axisLabel: {
-      color: '#5f7077',
+      color: '#17343d',
       fontSize: 11,
+      interval: 0,
+      rotate: chartState.value.labels.length > 4 ? 18 : 0,
     },
   },
   yAxis: {
     type: 'value',
-    minInterval: 1,
+    min: 0,
+    max: 100,
     axisLabel: {
       color: '#5f7077',
-      fontSize: 11,
+      formatter: '{value}%',
     },
     splitLine: {
       lineStyle: {
@@ -83,29 +99,28 @@ const chartOption = computed(() => ({
   },
   series: [
     {
-      name: 'Failures',
-      type: 'line',
-      smooth: true,
-      showSymbol: true,
-      symbolSize: 7,
-      itemStyle: {
-        color: '#d64545',
-      },
-      lineStyle: {
-        width: 3,
-        color: '#d64545',
-      },
-      areaStyle: {
-        color: 'rgba(214, 69, 69, 0.10)',
-      },
+      name: 'Failure Rate',
+      type: 'bar',
       data: chartState.value.data,
+      barWidth: 24,
+      itemStyle: {
+        borderRadius: [8, 8, 0, 0],
+        color: (params: { data: number }) => getSeverityColor(params.data),
+      },
+      label: {
+        show: true,
+        position: 'top',
+        formatter: '{c}%',
+        color: '#4a5f67',
+        fontWeight: 700,
+      },
     },
   ],
 }));
 
 onMounted(async () => {
   try {
-    await analyticsStore.loadFailuresOverTime();
+    await analyticsStore.loadProcessFailureRates();
   } catch {
     // Error state is handled in the store.
   }
@@ -113,7 +128,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.failures-card {
+.failure-rate-card {
   border-radius: 24px;
   background: #ffffff;
   box-shadow: 0 18px 48px rgba(29, 49, 57, 0.08);
@@ -140,7 +155,7 @@ onMounted(async () => {
 }
 
 .state-box {
-  min-height: 300px;
+  min-height: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -155,7 +170,7 @@ onMounted(async () => {
 }
 
 .chart {
-  height: 320px;
+  height: 340px;
   width: 100%;
 }
 </style>

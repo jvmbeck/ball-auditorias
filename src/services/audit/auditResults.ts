@@ -2,6 +2,13 @@ import { db } from 'boot/firebase';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { AuditDocument, AuditResultDocument, UpdatableProcessStatus } from 'src/types/audit';
 
+function toDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /**
  * Creates one analytics document in `auditResults` for each process in the given audit.
  *
@@ -19,6 +26,9 @@ import type { AuditDocument, AuditResultDocument, UpdatableProcessStatus } from 
  * @param audit   Full audit document data (auditorId and processes are required)
  */
 export async function createAuditResults(auditId: string, audit: AuditDocument): Promise<void> {
+  const auditDate = audit.createdAt?.toDate ? audit.createdAt.toDate() : new Date();
+  const dateKey = toDateKey(auditDate);
+
   const writes = Object.entries(audit.processes).map(([processKey, process]) => {
     // Use `updated` as a safe fallback for any process left in a null state at completion.
     const status = (process.status ?? 'updated') as UpdatableProcessStatus;
@@ -29,8 +39,11 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
       turma: audit.turma,
       dayOfWeek: audit.dayOfWeek,
       yearMonth: audit.yearMonth,
+      date: dateKey,
+      process: processKey,
       processKey,
       status,
+      hasIssue: status === 'not_updated',
       createdAt: serverTimestamp(),
       hasImage: Boolean(process.imageUrl),
     };

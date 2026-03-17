@@ -5,6 +5,15 @@
         <p class="eyebrow">Ball Factory</p>
         <h1 class="hero-title">Daily Audit</h1>
         <p class="hero-subtitle">Inspect all 6 production processes and submit your findings.</p>
+        <q-btn
+          class="q-mt-md"
+          outline
+          color="primary"
+          icon="refresh"
+          label="Refresh analytics"
+          :loading="refreshingAnalytics"
+          @click="handleRefreshAnalytics"
+        />
       </section>
 
       <q-card flat bordered class="action-card">
@@ -96,17 +105,28 @@
           </template>
         </q-card-section>
       </q-card>
+
+      <FailuresByProcessCard class="q-mt-lg" />
+      <ProcessFailureRateCard class="q-mt-lg" />
+      <FailuresOverTimeCard class="q-mt-lg" />
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useQuasar } from 'quasar';
+import FailuresByProcessCard from 'src/components/FailuresByProcessCard.vue';
+import FailuresOverTimeCard from 'src/components/FailuresOverTimeCard.vue';
+import ProcessFailureRateCard from 'src/components/ProcessFailureRateCard.vue';
+import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { useAuditStore } from 'src/stores/audit.store';
 
 const TOTAL_PROCESSES = 6;
 
+const $q = useQuasar();
 const auditStore = useAuditStore();
+const analyticsStore = useAnalyticsStore();
 
 const todaysDraft = ref<{
   auditId: string;
@@ -114,6 +134,26 @@ const todaysDraft = ref<{
   completedCount: number;
   completed: boolean;
 } | null>(null);
+const refreshingAnalytics = ref(false);
+
+async function handleRefreshAnalytics() {
+  refreshingAnalytics.value = true;
+
+  try {
+    await analyticsStore.refreshAllAnalytics();
+    $q.notify({
+      type: 'positive',
+      message: 'Analytics refreshed.',
+    });
+  } catch {
+    $q.notify({
+      type: 'negative',
+      message: 'Unable to refresh analytics right now.',
+    });
+  } finally {
+    refreshingAnalytics.value = false;
+  }
+}
 
 onMounted(() => {
   todaysDraft.value = auditStore.checkTodaysDraft();
@@ -127,9 +167,9 @@ onMounted(() => {
 }
 
 .index-shell {
-  max-width: 520px;
+  max-width: 900px;
   margin: 0 auto;
-  padding-top: 10vh;
+  padding-top: min(10vh, 84px);
 }
 
 .eyebrow {

@@ -1,13 +1,7 @@
 import { db } from 'boot/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import type { FailuresOverTimeData } from 'src/types/audit';
-
-function toDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { toDateKey } from 'src/utils/dateFormatting';
 
 /**
  * Fetches and aggregates failed process records from `auditResults` for the last 30 days.

@@ -46,6 +46,12 @@ export interface AuditHistoryItem {
   processes: AuditProcesses;
 }
 
+export interface FailuresOverTimeData {
+  labels: string[];
+  data: number[];
+  countsByDate: Record<string, number>;
+}
+
 /** Write-side shape for a single analytics record in the `auditResults` collection. */
 export interface AuditResultDocument {
   auditId: string;
@@ -53,8 +59,10 @@ export interface AuditResultDocument {
   turma: 'A' | 'B' | 'C' | 'D';
   dayOfWeek: string;
   yearMonth: string;
+  date: string;
   processKey: string;
   status: UpdatableProcessStatus;
+  hasIssue: boolean;
   createdAt: FieldValue;
   hasImage: boolean;
 }

@@ -1,8 +1,20 @@
 import { defineStore } from 'pinia';
-import { computed, reactive, ref } from 'vue';
-import { createAudit, updateProcess, completeAudit } from 'src/services/audit';
+import { computed, reactive, ref, watch } from 'vue';
+import {
+  completeAudit,
+  createAudit,
+  getCompletedAuditsByAuditor,
+  getTodaysInProgressAuditId,
+  updateAuditTurma,
+  updateProcess,
+} from 'src/services/audit';
 import { useAuthStore } from 'stores/auth.store';
-import type { AuditProcessKey, AuditProcessStatus, UpdatableProcessStatus } from 'src/types/audit';
+import type {
+  AuditHistoryItem,
+  AuditProcessKey,
+  AuditProcessStatus,
+  UpdatableProcessStatus,
+} from 'src/types/audit';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -21,14 +33,32 @@ type ProcessFiles = Record<AuditProcessKey, File | null>;
 // ---------------------------------------------------------------------------
 
 const PROCESS_KEYS: AuditProcessKey[] = [
-  'rawMaterials',
-  'assembly',
-  'packaging',
-  'qualityCheck',
-  'storage',
-  'shipping',
-  'safetyInspection',
+  'frontEnd',
+  'lavadora',
+  'printer',
+  'necker',
+  'insideSpray',
+  'paletizadora',
 ];
+
+const AUDIT_DRAFT_STORAGE_KEY = 'audit-form-draft-v1';
+
+interface PersistedAuditDraft {
+  date: string;
+  auditorId: string;
+  auditId: string | null;
+  turma: 'A' | 'B' | 'C' | 'D' | null;
+  processState: ProcessState;
+  completed?: boolean;
+}
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function buildInitialProcessState(): ProcessState {
   return PROCESS_KEYS.reduce<ProcessState>((acc, key) => {
@@ -70,10 +100,89 @@ function isProcessReadyForSave(
 export const useAuditStore = defineStore('audit', () => {
   const authStore = useAuthStore();
 
+  function clearPersistedDraft() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.removeItem(AUDIT_DRAFT_STORAGE_KEY);
+  }
+
+  function readPersistedDraft(auditorId: string): PersistedAuditDraft | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const rawDraft = window.localStorage.getItem(AUDIT_DRAFT_STORAGE_KEY);
+
+    if (!rawDraft) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(rawDraft) as PersistedAuditDraft;
+      const isForToday = parsed.date === getTodayKey();
+      const isForAuditor = parsed.auditorId === auditorId;
+
+      if (!isForToday || !isForAuditor) {
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistDraft() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const auditorId = authStore.firebaseUser?.uid;
+
+    if (!auditorId || !auditId.value) {
+      return;
+    }
+
+    const snapshot = PROCESS_KEYS.reduce<ProcessState>((accumulator, key) => {
+      accumulator[key] = {
+        status: processState[key].status,
+        comment: processState[key].comment,
+      };
+      return accumulator;
+    }, {} as ProcessState);
+
+    const payload: PersistedAuditDraft = {
+      date: getTodayKey(),
+      auditorId,
+      auditId: auditId.value,
+      turma: turma.value,
+      processState: snapshot,
+    };
+
+    window.localStorage.setItem(AUDIT_DRAFT_STORAGE_KEY, JSON.stringify(payload));
+  }
+
+  function applyDraftState(draft: PersistedAuditDraft) {
+    turma.value = draft.turma ?? null;
+
+    PROCESS_KEYS.forEach((key) => {
+      processState[key] = {
+        status: draft.processState[key]?.status ?? null,
+        comment: draft.processState[key]?.comment ?? '',
+      };
+      processFiles[key] = null;
+    });
+  }
+
   // ── State ────────────────────────────────────────────────────────────────
 
   /** ID of the currently active audit document. */
   const auditId = ref<string | null>(null);
+
+  /** Selected work shift responsible for the audit. */
+  const turma = ref<'A' | 'B' | 'C' | 'D' | null>(null);
 
   /** Per-process status and comment, edited directly by the UI. */
   const processState = reactive<ProcessState>(buildInitialProcessState());
@@ -86,6 +195,15 @@ export const useAuditStore = defineStore('audit', () => {
 
   /** Holds the last error message produced by a store action. */
   const error = ref<string | null>(null);
+
+  /** Completed audits loaded for the history page. */
+  const auditHistory = ref<AuditHistoryItem[]>([]);
+
+  /** True while history data is being requested. */
+  const historyLoading = ref(false);
+
+  /** Holds the last history loading error. */
+  const historyError = ref<string | null>(null);
 
   // ── Computed ─────────────────────────────────────────────────────────────
 
@@ -102,7 +220,25 @@ export const useAuditStore = defineStore('audit', () => {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function resetState() {
+    const auditorId = authStore.firebaseUser?.uid;
+    const currentAuditId = auditId.value;
+
+    if (auditorId && currentAuditId && typeof window !== 'undefined') {
+      const marker: PersistedAuditDraft = {
+        date: getTodayKey(),
+        auditorId,
+        auditId: currentAuditId,
+        turma: turma.value,
+        processState: buildInitialProcessState(),
+        completed: true,
+      };
+      window.localStorage.setItem(AUDIT_DRAFT_STORAGE_KEY, JSON.stringify(marker));
+    } else {
+      clearPersistedDraft();
+    }
+
     auditId.value = null;
+    turma.value = null;
     error.value = null;
 
     PROCESS_KEYS.forEach((key) => {
@@ -140,7 +276,7 @@ export const useAuditStore = defineStore('audit', () => {
   /**
    * Creates a new audit document in Firestore and stores the returned ID.
    */
-  async function startAudit(): Promise<void> {
+  async function startAudit(selectedTurma: 'A' | 'B' | 'C' | 'D'): Promise<void> {
     const auditorId = authStore.firebaseUser?.uid;
 
     if (!auditorId) {
@@ -151,7 +287,24 @@ export const useAuditStore = defineStore('audit', () => {
     error.value = null;
 
     try {
-      auditId.value = await createAudit(auditorId);
+      const existingAuditId = await getTodaysInProgressAuditId(auditorId);
+      const draft = readPersistedDraft(auditorId);
+
+      if (existingAuditId) {
+        auditId.value = existingAuditId;
+        turma.value = draft?.turma ?? selectedTurma;
+
+        if (draft && draft.auditId === existingAuditId) {
+          applyDraftState(draft);
+        }
+
+        persistDraft();
+        return;
+      }
+
+      turma.value = selectedTurma;
+      auditId.value = await createAudit(auditorId, selectedTurma);
+      persistDraft();
     } catch (err: unknown) {
       error.value = err instanceof Error ? err.message : String(err);
       throw err;
@@ -223,21 +376,119 @@ export const useAuditStore = defineStore('audit', () => {
     }
   }
 
+  // Persist local form draft while the user edits the audit.
+  watch(auditId, () => {
+    persistDraft();
+  });
+
+  watch(
+    processState,
+    () => {
+      persistDraft();
+    },
+    { deep: true },
+  );
+
+  /**
+   * Reads today's local draft without any network request.
+   * Returns the saved progress count and auditId if a draft exists for today,
+   * null otherwise. Used by the dashboard to show a "continue" prompt.
+   */
+  function checkTodaysDraft(): {
+    auditId: string;
+    turma: 'A' | 'B' | 'C' | 'D' | null;
+    completedCount: number;
+    completed: boolean;
+  } | null {
+    const auditorId = authStore.firebaseUser?.uid;
+
+    if (!auditorId) {
+      return null;
+    }
+
+    const draft = readPersistedDraft(auditorId);
+
+    if (!draft?.auditId) {
+      return null;
+    }
+
+    if (draft.completed) {
+      return {
+        auditId: draft.auditId,
+        turma: draft.turma ?? null,
+        completedCount: PROCESS_KEYS.length,
+        completed: true,
+      };
+    }
+
+    const count = PROCESS_KEYS.filter((key) => draft.processState[key]?.status !== null).length;
+
+    return { auditId: draft.auditId, turma: draft.turma ?? null, completedCount: count, completed: false };
+  }
+
+  async function setTurma(value: 'A' | 'B' | 'C' | 'D' | null) {
+    turma.value = value;
+    persistDraft();
+
+    if (!value || !auditId.value) {
+      return;
+    }
+
+    try {
+      await updateAuditTurma(auditId.value, value);
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : String(err);
+      throw err;
+    }
+  }
+
+  /**
+   * Loads completed audits for the authenticated auditor.
+   */
+  async function loadAuditHistory(): Promise<void> {
+    const auditorId = authStore.firebaseUser?.uid;
+
+    if (!auditorId) {
+      auditHistory.value = [];
+      historyError.value = 'Cannot load audit history: no authenticated user.';
+      return;
+    }
+
+    historyLoading.value = true;
+    historyError.value = null;
+
+    try {
+      auditHistory.value = await getCompletedAuditsByAuditor(auditorId);
+    } catch (err: unknown) {
+      historyError.value = err instanceof Error ? err.message : String(err);
+      throw err;
+    } finally {
+      historyLoading.value = false;
+    }
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
 
   return {
     // state
     auditId,
+    turma,
     processState,
     processFiles,
     loading,
     error,
+    auditHistory,
+    historyLoading,
+    historyError,
     // computed
     completedCount,
     allProcessesCompleted,
     // actions
     startAudit,
+    setTurma,
     saveProcess,
     finishAudit,
+    checkTodaysDraft,
+    loadAuditHistory,
   };
 });

@@ -3,13 +3,12 @@ import type { FieldValue, Timestamp } from 'firebase/firestore';
 export type AuditStatus = 'in_progress' | 'completed';
 
 export type AuditProcessKey =
-  | 'rawMaterials'
-  | 'assembly'
-  | 'packaging'
-  | 'qualityCheck'
-  | 'storage'
-  | 'shipping'
-  | 'safetyInspection';
+  | 'frontEnd'
+  | 'lavadora'
+  | 'printer'
+  | 'necker'
+  | 'insideSpray'
+  | 'paletizadora';
 
 export type AuditProcessStatus = 'updated' | 'not_updated' | null;
 
@@ -23,6 +22,9 @@ export type AuditProcesses = Record<AuditProcessKey, AuditProcess>;
 
 export interface AuditDocument {
   auditorId: string;
+  turma: 'A' | 'B' | 'C' | 'D';
+  dayOfWeek: string;
+  yearMonth: string;
   createdAt: Timestamp;
   status: AuditStatus;
   processes: AuditProcesses;
@@ -31,10 +33,26 @@ export interface AuditDocument {
   hasFailures?: boolean;
 }
 
+export interface AuditHistoryItem {
+  id: string;
+  status: AuditStatus;
+  turma: 'A' | 'B' | 'C' | 'D' | null;
+  dayOfWeek: string;
+  yearMonth: string;
+  createdAt: Date | null;
+  failedProcesses: number;
+  totalProcesses: number;
+  hasFailures: boolean;
+  processes: AuditProcesses;
+}
+
 /** Write-side shape for a single analytics record in the `auditResults` collection. */
 export interface AuditResultDocument {
   auditId: string;
   auditorId: string;
+  turma: 'A' | 'B' | 'C' | 'D';
+  dayOfWeek: string;
+  yearMonth: string;
   processKey: string;
   status: UpdatableProcessStatus;
   createdAt: FieldValue;

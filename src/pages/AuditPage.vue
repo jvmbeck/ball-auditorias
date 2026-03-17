@@ -12,6 +12,18 @@
         </div>
 
         <div class="hero-stats">
+          <q-select
+            v-model="turma"
+            outlined
+            dense
+            emit-value
+            map-options
+            options-dense
+            :options="turmaOptions"
+            label="Turma responsável"
+            class="turma-select"
+          />
+
           <q-chip color="primary" text-color="white" icon="assignment_turned_in">
             {{ completedCount }} / {{ processDefinitions.length }} processes completed
           </q-chip>
@@ -41,7 +53,12 @@
           :key="process.key"
           class="col-12 col-md-6 col-xl-4"
         >
-          <q-card flat bordered class="process-card full-height">
+          <q-card
+            flat
+            bordered
+            class="process-card full-height"
+            :class="{ 'process-card-disabled': !canFillAudit }"
+          >
             <q-card-section class="row items-start justify-between q-gutter-sm">
               <div>
                 <div class="process-label">{{ process.label }}</div>
@@ -63,6 +80,7 @@
                 color="primary"
                 type="radio"
                 inline
+                :disable="!canFillAudit"
                 @update:model-value="onStatusChange(process.key)"
               />
 
@@ -74,6 +92,7 @@
                   type="textarea"
                   label="Explain the issue"
                   class="q-mb-md"
+                  :disable="!canFillAudit"
                 />
 
                 <q-file
@@ -83,6 +102,7 @@
                   accept="image/*"
                   label="Upload evidence photo"
                   bottom-slots
+                  :disable="!canFillAudit"
                 >
                   <template #prepend>
                     <q-icon name="photo_camera" />
@@ -110,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
@@ -118,18 +138,24 @@ import { useAuditStore } from 'src/stores/audit.store';
 import type { AuditProcessKey } from 'src/types/audit';
 
 const processDefinitions: Array<{ key: AuditProcessKey; label: string }> = [
-  { key: 'rawMaterials', label: 'Raw Materials' },
-  { key: 'assembly', label: 'Assembly' },
-  { key: 'packaging', label: 'Packaging' },
-  { key: 'qualityCheck', label: 'Quality Check' },
-  { key: 'storage', label: 'Storage' },
-  { key: 'shipping', label: 'Shipping' },
-  { key: 'safetyInspection', label: 'Safety Inspection' },
+  { key: 'frontEnd', label: 'Front End' },
+  { key: 'lavadora', label: 'Lavadora' },
+  { key: 'printer', label: 'Printer' },
+  { key: 'necker', label: 'Necker' },
+  { key: 'insideSpray', label: 'Inside Spray' },
+  { key: 'paletizadora', label: 'Paletizadora' },
 ];
 
 const statusOptions = [
   { label: 'Updated', value: 'updated' },
   { label: 'Issue Found', value: 'not_updated' },
+];
+
+const turmaOptions: Array<{ label: string; value: 'A' | 'B' | 'C' | 'D' }> = [
+  { label: 'Turma A', value: 'A' },
+  { label: 'Turma B', value: 'B' },
+  { label: 'Turma C', value: 'C' },
+  { label: 'Turma D', value: 'D' },
 ];
 
 const $q = useQuasar();
@@ -146,10 +172,20 @@ const {
   allProcessesCompleted,
 } = storeToRefs(auditStore);
 
+const turma = computed<'A' | 'B' | 'C' | 'D' | null>({
+  get: () => auditStore.turma ?? null,
+  set: (value) => {
+    if (typeof auditStore.setTurma === 'function') {
+      void auditStore.setTurma(value);
+    }
+  },
+});
+
 const isFinishing = ref(false);
 const pageError = ref<string | null>(null);
 
 const isBusy = computed(() => loading.value || isFinishing.value);
+const canFillAudit = computed(() => Boolean(auditId.value && turma.value));
 
 function getProcessChip(processKey: AuditProcessKey) {
   const status = processState.value[processKey].status;
@@ -192,12 +228,12 @@ function onStatusChange(processKey: AuditProcessKey) {
 }
 
 async function ensureAuditSession() {
-  if (auditId.value) {
+  if (auditId.value || !turma.value) {
     return;
   }
 
   try {
-    await auditStore.startAudit();
+    await auditStore.startAudit(turma.value);
   } catch (err: unknown) {
     pageError.value = err instanceof Error ? err.message : String(err);
   }
@@ -223,6 +259,17 @@ async function finishAudit() {
 }
 
 onMounted(() => {
+  const draft = auditStore.checkTodaysDraft();
+
+  if (draft?.turma && !turma.value) {
+    void auditStore.setTurma(draft.turma);
+  }
+
+  void ensureAuditSession();
+});
+
+watch(turma, () => {
+  pageError.value = null;
   void ensureAuditSession();
 });
 </script>
@@ -280,6 +327,21 @@ onMounted(() => {
   margin: 18px 0 20px;
 }
 
+.turma-select {
+  min-width: 220px;
+}
+
+.turma-select :deep(.q-field__native),
+.turma-select :deep(.q-field__label),
+.turma-select :deep(.q-field__marginal),
+.turma-select :deep(.q-icon) {
+  color: white;
+}
+
+.turma-select :deep(.q-field__control) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .process-card {
   display: flex;
   flex-direction: column;
@@ -287,6 +349,10 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
   box-shadow: 0 18px 38px rgba(29, 49, 57, 0.08);
+}
+
+.process-card-disabled {
+  opacity: 0.6;
 }
 
 .process-label {

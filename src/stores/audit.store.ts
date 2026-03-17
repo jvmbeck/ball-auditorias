@@ -1,8 +1,20 @@
 import { defineStore } from 'pinia';
 import { computed, reactive, ref } from 'vue';
-import { createAudit, updateProcess, completeAudit } from 'src/services/audit';
+import {
+  completeAudit,
+  createAudit,
+  getCompletedAuditsByAuditor,
+  getTodaysInProgressAuditId,
+  updateAuditTurma,
+  updateProcess,
+} from 'src/services/audit';
 import { useAuthStore } from 'stores/auth.store';
-import type { AuditProcessKey, AuditProcessStatus, UpdatableProcessStatus } from 'src/types/audit';
+import type {
+  AuditHistoryItem,
+  AuditProcessKey,
+  AuditProcessStatus,
+  UpdatableProcessStatus,
+} from 'src/types/audit';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -21,14 +33,21 @@ type ProcessFiles = Record<AuditProcessKey, File | null>;
 // ---------------------------------------------------------------------------
 
 const PROCESS_KEYS: AuditProcessKey[] = [
-  'rawMaterials',
-  'assembly',
-  'packaging',
-  'qualityCheck',
-  'storage',
-  'shipping',
-  'safetyInspection',
+  'frontEnd',
+  'lavadora',
+  'printer',
+  'necker',
+  'insideSpray',
+  'paletizadora',
 ];
+
+function getTodayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function buildInitialProcessState(): ProcessState {
   return PROCESS_KEYS.reduce<ProcessState>((acc, key) => {
@@ -67,177 +86,356 @@ function isProcessReadyForSave(
 // Store
 // ---------------------------------------------------------------------------
 
-export const useAuditStore = defineStore('audit', () => {
-  const authStore = useAuthStore();
+export const useAuditStore = defineStore(
+  'audit',
+  () => {
+    const authStore = useAuthStore();
 
-  // ── State ────────────────────────────────────────────────────────────────
+    // ── State ────────────────────────────────────────────────────────────────
 
-  /** ID of the currently active audit document. */
-  const auditId = ref<string | null>(null);
+    /** ID of the currently active audit document. */
+    const auditId = ref<string | null>(null);
 
-  /** Per-process status and comment, edited directly by the UI. */
-  const processState = reactive<ProcessState>(buildInitialProcessState());
+    /** Selected work shift responsible for the audit. */
+    const turma = ref<'A' | 'B' | 'C' | 'D' | null>(null);
 
-  /** Temporary file references for each process — cleared after a successful save. */
-  const processFiles = reactive<ProcessFiles>(buildInitialProcessFiles());
+    /** Per-process status and comment, edited directly by the UI. */
+    const processState = reactive<ProcessState>(buildInitialProcessState());
 
-  /** True while any async action is in flight. */
-  const loading = ref(false);
+    /** Temporary file references for each process — cleared after a successful save. */
+    const processFiles = reactive<ProcessFiles>(buildInitialProcessFiles());
 
-  /** Holds the last error message produced by a store action. */
-  const error = ref<string | null>(null);
+    /** True while any async action is in flight. */
+    const loading = ref(false);
 
-  // ── Computed ─────────────────────────────────────────────────────────────
+    /** Holds the last error message produced by a store action. */
+    const error = ref<string | null>(null);
 
-  /** Number of processes that have been given a non-null status. */
-  const completedCount = computed<number>(
-    () => PROCESS_KEYS.filter((key) => processState[key].status !== null).length,
-  );
+    /** Completed audits loaded for the history page. */
+    const auditHistory = ref<AuditHistoryItem[]>([]);
 
-  /** True when every process has been filled in. */
-  const allProcessesCompleted = computed<boolean>(
-    () => completedCount.value === PROCESS_KEYS.length,
-  );
+    /** True while history data is being requested. */
+    const historyLoading = ref(false);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+    /** Holds the last history loading error. */
+    const historyError = ref<string | null>(null);
 
-  function resetState() {
-    auditId.value = null;
-    error.value = null;
+    // ── Draft metadata (persisted alongside audit state) ──────────────────
 
-    PROCESS_KEYS.forEach((key) => {
-      processState[key] = { status: null, comment: '' };
-      processFiles[key] = null;
-    });
-  }
+    /** Date key (YYYY-MM-DD) when the active draft was created. Used to detect stale drafts on startup. */
+    const draftDate = ref<string | null>(null);
 
-  async function persistProcess(processKey: AuditProcessKey) {
-    if (!auditId.value) {
-      throw new Error('Cannot save a process: no active audit. Call startAudit() first.');
-    }
+    /** Auditor UID who owns the persisted draft. Prevents one user from resuming another's session. */
+    const draftAuditorId = ref<string | null>(null);
 
-    const { status, comment } = processState[processKey];
+    /** True once the day's audit has been submitted. */
+    const draftCompleted = ref(false);
 
-    if (!status) {
-      throw new Error(`Cannot save process "${processKey}": status has not been set.`);
-    }
+    /**
+     * Audit ID captured at completion time.
+     * Kept after `auditId` is nulled so the dashboard can still reference
+     * the finished document.
+     */
+    const draftCompletedAuditId = ref<string | null>(null);
 
-    const file = processFiles[processKey];
+    /** Turma captured at completion time (mirrors the same need as `draftCompletedAuditId`). */
+    const draftCompletedTurma = ref<'A' | 'B' | 'C' | 'D' | null>(null);
 
-    await updateProcess(
-      auditId.value,
-      processKey,
-      status as UpdatableProcessStatus,
-      comment || null,
-      file,
+    // ── Computed ─────────────────────────────────────────────────────────────
+
+    /** Number of processes that have been given a non-null status. */
+    const completedCount = computed<number>(
+      () => PROCESS_KEYS.filter((key) => processState[key].status !== null).length,
     );
 
-    processFiles[processKey] = null;
-  }
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
-  /**
-   * Creates a new audit document in Firestore and stores the returned ID.
-   */
-  async function startAudit(): Promise<void> {
-    const auditorId = authStore.firebaseUser?.uid;
-
-    if (!auditorId) {
-      throw new Error('Cannot start an audit: no authenticated user.');
-    }
-
-    loading.value = true;
-    error.value = null;
-
-    try {
-      auditId.value = await createAudit(auditorId);
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : String(err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Persists the status, comment, and optional image for a single process.
-   * Clears the temporary file reference on success.
-   *
-   * @param processKey Process to save
-   */
-  async function saveProcess(processKey: AuditProcessKey): Promise<void> {
-    loading.value = true;
-    error.value = null;
-
-    try {
-      await persistProcess(processKey);
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : String(err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
-   * Persists every process, then marks the active audit as completed.
-   * Resets local state so the store is ready for a new audit session.
-   */
-  async function finishAudit(): Promise<void> {
-    if (!auditId.value) {
-      throw new Error('Cannot finish audit: no active audit.');
-    }
-
-    if (!allProcessesCompleted.value) {
-      throw new Error(
-        `Cannot finish audit: ${PROCESS_KEYS.length - completedCount.value} process(es) still pending.`,
-      );
-    }
-
-    const invalidProcess = PROCESS_KEYS.find(
-      (processKey) => !isProcessReadyForSave(processState, processFiles, processKey),
+    /** True when every process has been filled in. */
+    const allProcessesCompleted = computed<boolean>(
+      () => completedCount.value === PROCESS_KEYS.length,
     );
 
-    if (invalidProcess) {
-      throw new Error(
-        `Cannot finish audit: ${invalidProcess} requires a complete status, comment, and photo before submission.`,
-      );
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function resetState() {
+      // Capture current values before nulling them so the dashboard can still
+      // reference the just-completed audit via checkTodaysDraft().
+      draftCompletedAuditId.value = auditId.value;
+      draftCompletedTurma.value = turma.value;
+      draftCompleted.value = true;
+
+      auditId.value = null;
+      turma.value = null;
+      error.value = null;
+
+      PROCESS_KEYS.forEach((key) => {
+        processState[key] = { status: null, comment: '' };
+        processFiles[key] = null;
+      });
     }
 
-    loading.value = true;
-    error.value = null;
-
-    try {
-      for (const processKey of PROCESS_KEYS) {
-        await persistProcess(processKey);
+    async function persistProcess(processKey: AuditProcessKey) {
+      if (!auditId.value) {
+        throw new Error('Cannot save a process: no active audit. Call startAudit() first.');
       }
 
-      await completeAudit(auditId.value);
-      resetState();
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : String(err);
-      throw err;
-    } finally {
-      loading.value = false;
+      const { status, comment } = processState[processKey];
+
+      if (!status) {
+        throw new Error(`Cannot save process "${processKey}": status has not been set.`);
+      }
+
+      const file = processFiles[processKey];
+
+      await updateProcess(
+        auditId.value,
+        processKey,
+        status as UpdatableProcessStatus,
+        comment || null,
+        file,
+      );
+
+      processFiles[processKey] = null;
     }
-  }
 
-  // ── Public API ────────────────────────────────────────────────────────────
+    // ── Actions ───────────────────────────────────────────────────────────────
 
-  return {
-    // state
-    auditId,
-    processState,
-    processFiles,
-    loading,
-    error,
-    // computed
-    completedCount,
-    allProcessesCompleted,
-    // actions
-    startAudit,
-    saveProcess,
-    finishAudit,
-  };
-});
+    /**
+     * Creates a new audit document in Firestore and stores the returned ID.
+     * On reload, re-attaches to today's in-progress audit and restores
+     * persisted process state when the draft belongs to the same audit.
+     */
+    async function startAudit(selectedTurma: 'A' | 'B' | 'C' | 'D'): Promise<void> {
+      const auditorId = authStore.firebaseUser?.uid;
+
+      if (!auditorId) {
+        throw new Error('Cannot start an audit: no authenticated user.');
+      }
+
+      loading.value = true;
+      error.value = null;
+
+      try {
+        const existingAuditId = await getTodaysInProgressAuditId(auditorId);
+
+        // The persisted draft is valid when it belongs to today, this auditor,
+        // and has not been marked completed.
+        const hasDraft =
+          Boolean(auditId.value) &&
+          draftAuditorId.value === auditorId &&
+          draftDate.value === getTodayKey() &&
+          !draftCompleted.value;
+
+        if (existingAuditId) {
+          const draftMatchesExisting = hasDraft && auditId.value === existingAuditId;
+
+          if (!draftMatchesExisting) {
+            // Firestore has a different or newer audit — discard the stale local state.
+            PROCESS_KEYS.forEach((key) => {
+              processState[key] = { status: null, comment: '' };
+            });
+          }
+
+          auditId.value = existingAuditId;
+          turma.value = draftMatchesExisting ? (turma.value ?? selectedTurma) : selectedTurma;
+          draftDate.value = getTodayKey();
+          draftAuditorId.value = auditorId;
+          draftCompleted.value = false;
+          return;
+        }
+
+        // No in-progress audit for today — start fresh.
+        PROCESS_KEYS.forEach((key) => {
+          processState[key] = { status: null, comment: '' };
+        });
+        turma.value = selectedTurma;
+        auditId.value = await createAudit(auditorId, selectedTurma);
+        draftDate.value = getTodayKey();
+        draftAuditorId.value = auditorId;
+        draftCompleted.value = false;
+        draftCompletedAuditId.value = null;
+        draftCompletedTurma.value = null;
+      } catch (err: unknown) {
+        error.value = err instanceof Error ? err.message : String(err);
+        throw err;
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    /**
+     * Persists the status, comment, and optional image for a single process.
+     * Clears the temporary file reference on success.
+     *
+     * @param processKey Process to save
+     */
+    async function saveProcess(processKey: AuditProcessKey): Promise<void> {
+      loading.value = true;
+      error.value = null;
+
+      try {
+        await persistProcess(processKey);
+      } catch (err: unknown) {
+        error.value = err instanceof Error ? err.message : String(err);
+        throw err;
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    /**
+     * Persists every process, then marks the active audit as completed.
+     * Resets local state so the store is ready for a new audit session.
+     */
+    async function finishAudit(): Promise<void> {
+      if (!auditId.value) {
+        throw new Error('Cannot finish audit: no active audit.');
+      }
+
+      if (!allProcessesCompleted.value) {
+        throw new Error(
+          `Cannot finish audit: ${PROCESS_KEYS.length - completedCount.value} process(es) still pending.`,
+        );
+      }
+
+      const invalidProcess = PROCESS_KEYS.find(
+        (processKey) => !isProcessReadyForSave(processState, processFiles, processKey),
+      );
+
+      if (invalidProcess) {
+        throw new Error(
+          `Cannot finish audit: ${invalidProcess} requires a complete status, comment, and photo before submission.`,
+        );
+      }
+
+      loading.value = true;
+      error.value = null;
+
+      try {
+        for (const processKey of PROCESS_KEYS) {
+          await persistProcess(processKey);
+        }
+
+        await completeAudit(auditId.value);
+        resetState();
+      } catch (err: unknown) {
+        error.value = err instanceof Error ? err.message : String(err);
+        throw err;
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    /**
+     * Reads today's draft state without any network request.
+     * Used by the dashboard to show a "continue" prompt or completion indicator.
+     */
+    function checkTodaysDraft(): {
+      auditId: string;
+      turma: 'A' | 'B' | 'C' | 'D' | null;
+      completedCount: number;
+      completed: boolean;
+    } | null {
+      const auditorId = authStore.firebaseUser?.uid;
+
+      if (!auditorId || draftAuditorId.value !== auditorId || draftDate.value !== getTodayKey()) {
+        return null;
+      }
+
+      if (draftCompleted.value) {
+        if (!draftCompletedAuditId.value) return null;
+
+        return {
+          auditId: draftCompletedAuditId.value,
+          turma: draftCompletedTurma.value,
+          completedCount: PROCESS_KEYS.length,
+          completed: true,
+        };
+      }
+
+      if (!auditId.value) return null;
+
+      const count = PROCESS_KEYS.filter((key) => processState[key]?.status !== null).length;
+
+      return { auditId: auditId.value, turma: turma.value, completedCount: count, completed: false };
+    }
+
+    async function setTurma(value: 'A' | 'B' | 'C' | 'D' | null) {
+      turma.value = value;
+
+      if (!value || !auditId.value) {
+        return;
+      }
+
+      try {
+        await updateAuditTurma(auditId.value, value);
+      } catch (err: unknown) {
+        error.value = err instanceof Error ? err.message : String(err);
+        throw err;
+      }
+    }
+
+    /**
+     * Loads completed audits for the authenticated auditor.
+     */
+    async function loadAuditHistory(): Promise<void> {
+      const auditorId = authStore.firebaseUser?.uid;
+
+      if (!auditorId) {
+        auditHistory.value = [];
+        historyError.value = 'Cannot load audit history: no authenticated user.';
+        return;
+      }
+
+      historyLoading.value = true;
+      historyError.value = null;
+
+      try {
+        auditHistory.value = await getCompletedAuditsByAuditor(auditorId);
+      } catch (err: unknown) {
+        historyError.value = err instanceof Error ? err.message : String(err);
+        throw err;
+      } finally {
+        historyLoading.value = false;
+      }
+    }
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    return {
+      // state
+      auditId,
+      turma,
+      processState,
+      processFiles,
+      loading,
+      error,
+      auditHistory,
+      historyLoading,
+      historyError,
+      // computed
+      completedCount,
+      allProcessesCompleted,
+      // actions
+      startAudit,
+      setTurma,
+      saveProcess,
+      finishAudit,
+      checkTodaysDraft,
+      loadAuditHistory,
+    };
+  },
+  {
+    persist: {
+      key: 'audit-form-draft-v2',
+      pick: [
+        'auditId',
+        'turma',
+        'processState',
+        'draftDate',
+        'draftAuditorId',
+        'draftCompleted',
+        'draftCompletedAuditId',
+        'draftCompletedTurma',
+      ],
+    },
+  },
+);

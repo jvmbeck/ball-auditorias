@@ -26,6 +26,9 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
     const payload: AuditResultDocument = {
       auditId,
       auditorId: audit.auditorId,
+      turma: audit.turma,
+      dayOfWeek: audit.dayOfWeek,
+      yearMonth: audit.yearMonth,
       processKey,
       status,
       createdAt: serverTimestamp(),

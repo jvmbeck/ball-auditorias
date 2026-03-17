@@ -40,6 +40,7 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
       dayOfWeek: audit.dayOfWeek,
       yearMonth: audit.yearMonth,
       date: dateKey,
+      process: processKey,
       processKey,
       status,
       hasIssue: status === 'not_updated',

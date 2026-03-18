@@ -1,140 +1,91 @@
 <template>
   <q-page class="index-page q-pa-md q-pa-lg-xl">
     <div class="index-shell">
+      <!-- Hero section -->
       <section class="hero q-mb-xl">
-        <p class="eyebrow">Ball Factory</p>
-        <h1 class="hero-title">Daily Audit</h1>
-        <p class="hero-subtitle">Inspect all 6 production processes and submit your findings.</p>
-        <q-btn
-          class="q-mt-md"
-          outline
-          color="primary"
-          icon="refresh"
-          label="Refresh analytics"
-          :loading="refreshingAnalytics"
-          @click="handleRefreshAnalytics"
-        />
+        <p class="eyebrow">Ball</p>
+        <h1 class="hero-title">Auditorias</h1>
       </section>
 
-      <q-card flat bordered class="action-card">
-        <q-card-section>
-          <!-- Completed -->
-          <template v-if="todaysDraft?.completed">
-            <div class="resume-header q-mb-md">
-              <q-icon name="task_alt" size="28px" color="positive" class="q-mr-sm" />
-              <span class="resume-title" style="color: var(--q-positive)">Today's audit is complete</span>
-            </div>
+      <!-- Audit cards -->
+      <section class="audit-cards-grid q-mb-xl">
+        <DailyAuditCard />
+        <Checklist5SCard />
+      </section>
 
-            <div class="progress-row q-mb-md">
-              <span class="progress-label">
-                All {{ TOTAL_PROCESSES }} processes reviewed and submitted
-              </span>
-              <q-linear-progress
-                rounded
-                size="10px"
-                color="positive"
-                track-color="grey-3"
-                :value="1"
-                class="q-mt-sm"
-              />
-            </div>
+      <!-- Analytics section -->
+      <section class="analytics-section">
+        <div class="analytics-header q-mb-md">
+          <div>
+            <p class="eyebrow">Análises</p>
+            <h2 class="section-title">Insights de Performance</h2>
+          </div>
 
+          <div class="analytics-controls">
             <q-btn
-              unelevated
-              color="positive"
-              icon-right="history"
-              label="View Audit History"
-              size="md"
-              :to="{ name: 'audit-history' }"
-              class="full-width"
-            />
-          </template>
-
-          <!-- In progress -->
-          <template v-else-if="todaysDraft">
-            <div class="resume-header q-mb-md">
-              <q-icon name="pending_actions" size="28px" color="primary" class="q-mr-sm" />
-              <span class="resume-title">Audit in progress</span>
-            </div>
-
-            <div class="progress-row q-mb-md">
-              <span class="progress-label">
-                {{ todaysDraft.completedCount }} / {{ TOTAL_PROCESSES }} processes reviewed
-              </span>
-              <q-linear-progress
-                rounded
-                size="10px"
-                color="primary"
-                track-color="grey-3"
-                :value="todaysDraft.completedCount / TOTAL_PROCESSES"
-                class="q-mt-sm"
-              />
-            </div>
-
-            <q-btn
-              unelevated
+              outline
               color="primary"
-              icon-right="arrow_forward"
-              label="Continue Audit"
-              size="md"
-              to="/audits"
-              class="full-width"
+              icon="refresh"
+              label="Refresh"
+              :loading="refreshingAnalytics"
+              @click="handleRefreshAnalytics"
+              class="q-mr-md"
             />
-          </template>
 
-          <!-- Not started -->
-          <template v-else>
-            <div class="start-header q-mb-md">
-              <q-icon name="fact_check" size="28px" color="positive" class="q-mr-sm" />
-              <span class="start-title">No audit started today</span>
-            </div>
-
-            <p class="start-hint q-mb-md">
-              Begin a new inspection to review all production processes.
-            </p>
-
-            <q-btn
-              unelevated
-              color="positive"
-              icon-right="arrow_forward"
-              label="Start Audit"
-              size="md"
-              to="/audits"
-              class="full-width"
+            <q-select
+              outlined
+              dense
+              :model-value="selectedDays"
+              :options="daysOptions"
+              option-value="value"
+              option-label="label"
+              @update:model-value="(v) => (selectedDays = v)"
+              label="Select period"
+              class="days-select"
             />
-          </template>
-        </q-card-section>
-      </q-card>
+          </div>
+        </div>
 
-      <FailuresByProcessCard class="q-mt-lg" />
-      <ProcessFailureRateCard class="q-mt-lg" />
-      <FailuresOverTimeCard class="q-mt-lg" />
+        <!-- Responsive charts grid -->
+        <div class="charts-grid">
+          <div class="chart-item">
+            <FailuresByProcessCard />
+          </div>
+          <div class="chart-item">
+            <ProcessFailureRateCard />
+          </div>
+          <div class="chart-item">
+            <FailuresOverTimeCard />
+          </div>
+        </div>
+      </section>
     </div>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { useQuasar } from 'quasar';
+import Checklist5SCard from 'src/components/Checklist5SCard.vue';
+import DailyAuditCard from 'src/components/DailyAuditCard.vue';
 import FailuresByProcessCard from 'src/components/FailuresByProcessCard.vue';
 import FailuresOverTimeCard from 'src/components/FailuresOverTimeCard.vue';
 import ProcessFailureRateCard from 'src/components/ProcessFailureRateCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
-import { useAuditStore } from 'src/stores/audit.store';
-
-const TOTAL_PROCESSES = 6;
 
 const $q = useQuasar();
-const auditStore = useAuditStore();
 const analyticsStore = useAnalyticsStore();
 
-const todaysDraft = ref<{
-  auditId: string;
-  turma: 'A' | 'B' | 'C' | 'D' | null;
-  completedCount: number;
-  completed: boolean;
-} | null>(null);
 const refreshingAnalytics = ref(false);
+const selectedDays = ref(30);
+
+const daysOptions = [
+  { label: 'Last 7 days', value: 7 },
+  { label: 'Last 14 days', value: 14 },
+  { label: 'Last 30 days', value: 30 },
+  { label: 'Last 60 days', value: 60 },
+  { label: 'Last 90 days', value: 90 },
+];
 
 async function handleRefreshAnalytics() {
   refreshingAnalytics.value = true;
@@ -154,10 +105,6 @@ async function handleRefreshAnalytics() {
     refreshingAnalytics.value = false;
   }
 }
-
-onMounted(() => {
-  todaysDraft.value = auditStore.checkTodaysDraft();
-});
 </script>
 
 <style scoped>
@@ -167,7 +114,7 @@ onMounted(() => {
 }
 
 .index-shell {
-  max-width: 900px;
+  max-width: 1320px;
   margin: 0 auto;
   padding-top: min(10vh, 84px);
 }
@@ -194,38 +141,88 @@ onMounted(() => {
   font-size: 1rem;
 }
 
-.action-card {
-  border-radius: 24px;
-  background: white;
-  box-shadow: 0 18px 48px rgba(29, 49, 57, 0.08);
+.analytics-section {
+  margin-top: 2rem;
 }
 
-.resume-header,
-.start-header {
+.audit-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.analytics-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2rem;
 }
 
-.resume-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #17343d;
-}
-
-.start-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #17343d;
-}
-
-.progress-label {
-  font-size: 0.9rem;
-  color: #5f7077;
-}
-
-.start-hint {
-  color: #5f7077;
-  font-size: 0.95rem;
+.section-title {
   margin: 0;
+  font-size: 1.35rem;
+  color: #17343d;
+  font-weight: 700;
+}
+
+.analytics-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.days-select {
+  min-width: 180px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.chart-item {
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .analytics-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .analytics-controls {
+    flex-direction: column;
+  }
+
+  .audit-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .days-select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1101px) {
+  .charts-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 </style>

@@ -1,8 +1,8 @@
 <template>
   <q-card flat bordered class="failures-process-card">
     <q-card-section>
-      <p class="eyebrow">Priority Insight</p>
-      <h2 class="title">Failures by Process</h2>
+      <p class="eyebrow">Insight Prioritário</p>
+      <h2 class="title">Falhas por Processos</h2>
       <p class="subtitle">Last 30 days</p>
 
       <q-badge

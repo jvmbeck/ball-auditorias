@@ -3,7 +3,6 @@
     <q-card-section>
       <p class="eyebrow">Insight Prioritário</p>
       <h2 class="title">Falhas por Processos</h2>
-      <p class="subtitle">Last 30 days</p>
 
       <q-badge
         v-if="mostProblematicProcess"
@@ -12,7 +11,7 @@
         class="q-mt-sm"
         rounded
       >
-        Most problematic process: {{ mostProblematicProcess }}
+        Processo mais problemático: {{ mostProblematicProcess }}
       </q-badge>
     </q-card-section>
 
@@ -21,7 +20,7 @@
     <q-card-section>
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="40px" />
-        <p class="state-text">Loading process failures...</p>
+        <p class="state-text">Carregando falhas do processo...</p>
       </div>
 
       <div v-else-if="error" class="state-box">
@@ -31,7 +30,7 @@
 
       <div v-else-if="!chartState.labels.length" class="state-box">
         <q-icon name="check_circle" color="positive" size="28px" />
-        <p class="state-text">No process failures in the selected period.</p>
+        <p class="state-text">Nenhuma falha de processo no período selecionado.</p>
       </div>
 
       <VChart v-else autoresize :option="chartOption" class="chart" />

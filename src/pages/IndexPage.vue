@@ -19,6 +19,10 @@
           <div>
             <p class="eyebrow">Análises</p>
             <h2 class="section-title">Insights de Performance</h2>
+            <p class="subtitle">
+              Identifique quais processos estão apresentando mais falhas e priorize ações de
+              melhoria.
+            </p>
           </div>
 
           <div class="analytics-controls">
@@ -49,10 +53,10 @@
         <!-- Responsive charts grid -->
         <div class="charts-grid">
           <div class="chart-item">
-            <FailuresByProcessCard />
+            <ProcessFailureRateCard />
           </div>
           <div class="chart-item">
-            <ProcessFailureRateCard />
+            <FailuresByProcessCard />
           </div>
           <div class="chart-item">
             <FailuresOverTimeCard />

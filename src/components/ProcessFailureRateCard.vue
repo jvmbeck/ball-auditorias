@@ -1,9 +1,8 @@
 <template>
   <q-card flat bordered class="failure-rate-card">
     <q-card-section>
-      <p class="eyebrow">Reliability</p>
-      <h2 class="title">Process Failure Rate</h2>
-      <p class="subtitle">Last 30 days</p>
+      <p class="eyebrow">Confiabilidade</p>
+      <h2 class="title">Taxa de Falha do Processo</h2>
     </q-card-section>
 
     <q-separator />
@@ -11,7 +10,7 @@
     <q-card-section>
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="40px" />
-        <p class="state-text">Loading process reliability...</p>
+        <p class="state-text">Carregando confiabilidade do processo...</p>
       </div>
 
       <div v-else-if="error" class="state-box">
@@ -21,7 +20,7 @@
 
       <div v-else-if="!chartState.labels.length" class="state-box">
         <q-icon name="check_circle" color="positive" size="28px" />
-        <p class="state-text">No process executions found in the selected period.</p>
+        <p class="state-text">Nenhuma execução de processo encontrada no período selecionado.</p>
       </div>
 
       <VChart v-else autoresize :option="chartOption" class="chart" />

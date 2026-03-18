@@ -2,8 +2,7 @@
   <q-card flat bordered class="failures-card">
     <q-card-section>
       <p class="eyebrow">Dashboard</p>
-      <h2 class="title">Failures Over Time</h2>
-      <p class="subtitle">Last 30 days</p>
+      <h2 class="title">Falhas ao Longo do Tempo</h2>
     </q-card-section>
 
     <q-separator />
@@ -11,7 +10,7 @@
     <q-card-section>
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="40px" />
-        <p class="state-text">Loading failure trend...</p>
+        <p class="state-text">Carregando tendência de falhas...</p>
       </div>
 
       <div v-else-if="error" class="state-box">
@@ -21,7 +20,7 @@
 
       <div v-else-if="!hasAnyFailures" class="state-box">
         <q-icon name="insights" color="positive" size="28px" />
-        <p class="state-text">No failures detected in the selected period.</p>
+        <p class="state-text">Nenhuma falha encontrada no período selecionado.</p>
       </div>
 
       <VChart v-else autoresize :option="chartOption" class="chart" />

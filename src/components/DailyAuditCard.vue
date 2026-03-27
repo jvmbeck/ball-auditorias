@@ -5,27 +5,20 @@
       <template v-if="todaysDraft?.completed">
         <div class="content-stack">
           <div class="resume-header">
-            <q-icon name="task_alt" size="28px" color="positive" class="q-mr-sm" />
-            <span class="resume-title" style="color: var(--q-positive)"
-              >Auditoria de hoje concluída</span
-            >
+            <q-icon name="fact_check" size="28px" color="positive" class="q-mr-sm" />
+            <span class="resume-title" style="color: var(--q-positive)">Checklist e Quadros</span>
           </div>
 
           <div class="progress-row">
             <span class="progress-label">
               Todos os {{ TOTAL_PROCESSES }} processos revisados e enviados
             </span>
-            <q-linear-progress
-              rounded
-              size="10px"
-              color="positive"
-              track-color="grey-3"
-              :value="1"
-              class="q-mt-sm"
-            />
           </div>
         </div>
 
+        <div class="status-row">
+          <q-chip dense color="positive" text-color="white" icon="task_alt">Concluída</q-chip>
+        </div>
         <q-btn
           unelevated
           color="positive"
@@ -41,14 +34,15 @@
       <template v-else-if="todaysDraft">
         <div class="content-stack">
           <div class="resume-header">
-            <q-icon name="pending_actions" size="28px" color="primary" class="q-mr-sm" />
-            <span class="resume-title">Auditoria em andamento</span>
+            <q-icon name="fact_check" size="28px" color="primary" class="q-mr-sm" />
+            <span class="resume-title">Checklists e Quadros</span>
           </div>
 
           <div class="progress-row">
             <span class="progress-label">
               {{ todaysDraft.completedCount }} / {{ TOTAL_PROCESSES }} processos revisados
             </span>
+
             <q-linear-progress
               rounded
               size="10px"
@@ -59,7 +53,11 @@
             />
           </div>
         </div>
-
+        <div class="status-row">
+          <q-chip dense color="primary" text-color="white" icon="pending_actions"
+            >Em andamento</q-chip
+          >
+        </div>
         <q-btn
           unelevated
           color="primary"
@@ -76,14 +74,18 @@
         <div class="content-stack">
           <div class="start-header">
             <q-icon name="fact_check" size="28px" color="positive" class="q-mr-sm" />
-            <span class="start-title">Nenhuma auditoria iniciada hoje</span>
+            <span class="start-title">Checklists e Quadros</span>
           </div>
 
           <p class="start-hint">
             Inicie uma nova auditoria para revisar todos os processos de produção.
           </p>
         </div>
-
+        <div class="status-row">
+          <q-chip dense color="grey-3" text-color="grey-8" icon="schedule"
+            >Ainda não iniciada</q-chip
+          >
+        </div>
         <q-btn
           unelevated
           color="positive"
@@ -171,5 +173,10 @@ onMounted(() => {
   color: #5f7077;
   font-size: 0.95rem;
   margin: 0;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
 }
 </style>

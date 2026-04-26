@@ -1,6 +1,6 @@
 import { db } from 'boot/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import type { FailuresByProcessData } from 'src/types/audit';
+import type { FailuresByProcessData, AuditType } from 'src/types/audit';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 const PROCESS_LABELS: Record<string, string> = {
@@ -10,6 +10,13 @@ const PROCESS_LABELS: Record<string, string> = {
   necker: 'Necker',
   insideSpray: 'Inside Spray',
   paletizadora: 'Paletizadora',
+  minsters: 'Minsters',
+  bodyMakers11to14: 'Body Makers 11 a 14',
+  bodyMakers15to18: 'Body Makers 15 a 18',
+  bodyMakers19to23: 'Body Makers 19 a 23',
+  bodyMakers24to31: 'Body Makers 24 a 31',
+  printer1: 'Printer 1',
+  printer2e3: 'Printer 2 e 3',
 };
 
 function normalizeProcessLabel(process: string): string {
@@ -25,13 +32,20 @@ function normalizeProcessLabel(process: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function getResultsCollection(type?: AuditType): string {
+  if (type === 'rto') return 'rtoProcessResults';
+  if (type === 'board5s') return 'board5sProcessResults';
+  return 'auditResults'; // Legacy fallback
+}
+
 /**
  * Fetches failed audit results and groups them by process for the last 30 days.
+ * Supports both legacy (auditResults) and dual-type collections.
  *
- * The query filters by `hasIssue == true`; the date range is enforced in code
- * to avoid requiring a composite index.
+ * @param type Optional audit type ('rto' or 'board5s'). If omitted, uses legacy collection.
+ * @returns Processed failure counts grouped by process
  */
-export async function fetchFailuresByProcess(): Promise<FailuresByProcessData> {
+export async function fetchFailuresByProcess(type?: AuditType): Promise<FailuresByProcessData> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -41,7 +55,8 @@ export async function fetchFailuresByProcess(): Promise<FailuresByProcessData> {
 
   const failuresByProcess: Record<string, number> = {};
 
-  const failuresQuery = query(collection(db, 'auditResults'), where('hasIssue', '==', true));
+  const collectionName = getResultsCollection(type);
+  const failuresQuery = query(collection(db, collectionName), where('hasIssue', '==', true));
   const snapshots = await getDocs(failuresQuery);
 
   snapshots.forEach((snapshot) => {

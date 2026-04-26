@@ -3,39 +3,13 @@
     <div class="page-shell">
       <section class="hero-card q-mb-lg">
         <div class="hero-copy">
-          <p class="eyebrow">Factory Audit</p>
-          <h1 class="page-title">Process Inspection</h1>
+          <p class="eyebrow">Auditoria RTO e 5S</p>
+          <h1 class="page-title">Inspeção de Processos Dupla</h1>
           <p class="page-subtitle">
-            Review each process in any order, record issues with evidence, and submit everything
-            together when the audit is complete.
+            Complete ambas as auditorias RTO e 5S. Revise cada processo, registre problemas com
+            evidências e envie tudo junto.
           </p>
         </div>
-
-        <div class="hero-stats">
-          <q-select
-            v-model="turma"
-            outlined
-            dense
-            emit-value
-            map-options
-            options-dense
-            :options="turmaOptions"
-            label="Turma responsável"
-            class="turma-select"
-          />
-
-          <q-chip color="primary" text-color="white" icon="assignment_turned_in">
-            {{ completedCount }} / {{ processDefinitions.length }} processes completed
-          </q-chip>
-        </div>
-
-        <q-linear-progress
-          rounded
-          size="12px"
-          color="positive"
-          track-color="grey-3"
-          :value="completedCount / processDefinitions.length"
-        />
       </section>
 
       <q-banner
@@ -47,82 +21,114 @@
         {{ pageError || error }}
       </q-banner>
 
-      <div class="row q-col-gutter-lg">
+      <!-- Audit Tabs -->
+      <q-tabs
+        v-model="selectedAuditType"
+        dense
+        class="text-primary q-mb-lg"
+        active-color="primary"
+        indicator-color="primary"
+      >
+        <q-tab name="rto" label="RTO">
+          <template #default>
+            <div class="tab-label-content">
+              <span>RTO</span>
+              <q-chip
+                size="sm"
+                color="primary"
+                text-color="white"
+                :label="`${checklistCompletedCount} / ${rtoProcessDefinitions.length}`"
+              />
+            </div>
+          </template>
+        </q-tab>
+
+        <q-tab name="board5s" label="Board 5S">
+          <template #default>
+            <div class="tab-label-content">
+              <span>Board (5S)</span>
+              <q-chip
+                size="sm"
+                color="primary"
+                text-color="white"
+                :label="`${boardCompletedCount} / ${board5sProcessDefinitions.length}`"
+              />
+            </div>
+          </template>
+        </q-tab>
+      </q-tabs>
+
+      <!-- Progress Card for Current Tab -->
+      <section class="progress-card q-mb-lg">
+        <div class="progress-header">
+          <h3 class="progress-title">
+            {{ selectedAuditType === 'rto' ? 'RTO' : 'Board (5S)' }} Progresso
+          </h3>
+          <q-chip
+            color="primary"
+            text-color="white"
+            icon="assignment_turned_in"
+            :label="`${currentCompletedCount} / ${currentTotalProcesses} processos completos`"
+          />
+        </div>
+        <q-linear-progress
+          rounded
+          size="12px"
+          color="positive"
+          track-color="grey-3"
+          :value="currentCompletedCount / currentTotalProcesses"
+        />
+      </section>
+
+      <!-- Process Cards Grid -->
+      <div class="row q-col-gutter-lg q-mb-xl">
         <div
-          v-for="process in processDefinitions"
+          v-for="process in selectedAuditType === 'rto'
+            ? rtoProcessDefinitions
+            : board5sProcessDefinitions"
           :key="process.key"
           class="col-12 col-md-6 col-xl-4"
+          :class="{ 'process-card-disabled': !auditStarted }"
         >
-          <q-card
-            flat
-            bordered
-            class="process-card full-height"
-            :class="{ 'process-card-disabled': !canFillAudit }"
-          >
-            <q-card-section class="row items-start justify-between q-gutter-sm">
-              <div>
-                <div class="process-label">{{ process.label }}</div>
-                <div class="process-hint">
-                  Select the outcome now. Everything will be saved together when you finish the
-                  audit.
-                </div>
-              </div>
-
-              <q-chip dense :color="getProcessChip(process.key).color" text-color="white">
-                {{ getProcessChip(process.key).label }}
-              </q-chip>
-            </q-card-section>
-
-            <q-card-section>
-              <q-option-group
-                v-model="processState[process.key].status"
-                :options="statusOptions"
-                color="primary"
-                type="radio"
-                inline
-                :disable="!canFillAudit"
-                @update:model-value="onStatusChange(process.key)"
-              />
-
-              <div v-if="processState[process.key].status === 'not_updated'" class="q-mt-md">
-                <q-input
-                  v-model="processState[process.key].comment"
-                  autogrow
-                  outlined
-                  type="textarea"
-                  label="Explain the issue"
-                  class="q-mb-md"
-                  :disable="!canFillAudit"
-                />
-
-                <q-file
-                  v-model="processFiles[process.key]"
-                  outlined
-                  clearable
-                  accept="image/*"
-                  label="Upload evidence photo"
-                  bottom-slots
-                  :disable="!canFillAudit"
-                >
-                  <template #prepend>
-                    <q-icon name="photo_camera" />
-                  </template>
-                </q-file>
-              </div>
-            </q-card-section>
-          </q-card>
+          <ProcessCard
+            :process-key="process.key"
+            :label="process.label"
+            :model-value="
+              selectedAuditType === 'rto'
+                ? checklistProcessState[process.key as RtoAuditProcessKey]
+                : boardProcessState[process.key as Board5sAuditProcessKey]
+            "
+            :file="
+              selectedAuditType === 'rto'
+                ? checklistProcessFiles[process.key as RtoAuditProcessKey]
+                : boardProcessFiles[process.key as Board5sAuditProcessKey]
+            "
+            :loading="loading"
+            @update:model-value="
+              selectedAuditType === 'rto'
+                ? (checklistProcessState[process.key as RtoAuditProcessKey] = $event)
+                : (boardProcessState[process.key as Board5sAuditProcessKey] = $event)
+            "
+            @update:file="
+              selectedAuditType === 'rto'
+                ? (checklistProcessFiles[process.key as RtoAuditProcessKey] = $event)
+                : (boardProcessFiles[process.key as Board5sAuditProcessKey] = $event)
+            "
+            @save="saveCurrentProcess(process.key)"
+          />
         </div>
       </div>
 
-      <section class="footer-actions q-mt-xl">
+      <!-- Finish Button -->
+      <section class="footer-actions">
         <q-btn
           size="lg"
           color="positive"
           unelevated
-          label="Finish Audit"
-          :disable="!allProcessesCompleted || !allProcessesValid || !auditId || isBusy"
+          label="Finalizar Ambas as Auditorias"
+          :disable="!allComplete || !allProcessesValid || isBusy"
           :loading="isFinishing"
-          @click="finishAudit"
+          @click="finishAudits"
         />
       </section>
     </div>
@@ -130,14 +136,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
-import { useAuditStore } from 'src/stores/audit.store';
-import type { AuditProcessKey } from 'src/types/audit';
+import { useDualAuditStore } from 'src/stores/dualAudit.store';
+import ProcessCard from 'src/components/ProcessCard.vue';
+import type {
+  AuditType,
+  Board5sAuditProcessKey,
+  DualAuditProcessKey,
+  RtoAuditProcessKey,
+} from 'src/types/audit';
 
-const processDefinitions: Array<{ key: AuditProcessKey; label: string }> = [
+const rtoProcessDefinitions: Array<{ key: RtoAuditProcessKey; label: string }> = [
   { key: 'frontEnd', label: 'Front End' },
   { key: 'lavadora', label: 'Lavadora' },
   { key: 'printer', label: 'Printer' },
@@ -146,101 +158,92 @@ const processDefinitions: Array<{ key: AuditProcessKey; label: string }> = [
   { key: 'paletizadora', label: 'Paletizadora' },
 ];
 
-const statusOptions = [
-  { label: 'Updated', value: 'updated' },
-  { label: 'Issue Found', value: 'not_updated' },
-];
-
-const turmaOptions: Array<{ label: string; value: 'A' | 'B' | 'C' | 'D' }> = [
-  { label: 'Turma A', value: 'A' },
-  { label: 'Turma B', value: 'B' },
-  { label: 'Turma C', value: 'C' },
-  { label: 'Turma D', value: 'D' },
+const board5sProcessDefinitions: Array<{ key: Board5sAuditProcessKey; label: string }> = [
+  { key: 'minsters', label: 'Minsters' },
+  { key: 'bodyMakers11to14', label: 'Body Makers 11 a 14' },
+  { key: 'bodyMakers15to18', label: 'Body Makers 15 a 18' },
+  { key: 'bodyMakers19to23', label: 'Body Makers 19 a 23' },
+  { key: 'bodyMakers24to31', label: 'Body Makers 24 a 31' },
+  { key: 'printer1', label: 'Printer 1' },
+  { key: 'printer2e3', label: 'Printer 2 e 3' },
 ];
 
 const $q = useQuasar();
 const router = useRouter();
-const auditStore = useAuditStore();
+const auditStore = useDualAuditStore();
 
 const {
-  auditId,
-  processState,
-  processFiles,
+  checklistAuditId,
+  boardAuditId,
+  checklistProcessState,
+  boardProcessState,
+  checklistProcessFiles,
+  boardProcessFiles,
   loading,
   error,
-  completedCount,
-  allProcessesCompleted,
+  checklistCompletedCount,
+  boardCompletedCount,
+  allComplete,
 } = storeToRefs(auditStore);
 
-const turma = computed<'A' | 'B' | 'C' | 'D' | null>({
-  get: () => auditStore.turma ?? null,
-  set: (value) => {
-    if (typeof auditStore.setTurma === 'function') {
-      void auditStore.setTurma(value);
-    }
-  },
-});
-
+const selectedAuditType = ref<AuditType>('rto');
 const isFinishing = ref(false);
 const pageError = ref<string | null>(null);
 
+const auditStarted = computed(() => checklistAuditId.value !== null && boardAuditId.value !== null);
+
 const isBusy = computed(() => loading.value || isFinishing.value);
-const canFillAudit = computed(() => Boolean(auditId.value && turma.value));
 
-function getProcessChip(processKey: AuditProcessKey) {
-  const status = processState.value[processKey].status;
+const currentCompletedCount = computed(() =>
+  selectedAuditType.value === 'rto' ? checklistCompletedCount.value : boardCompletedCount.value,
+);
 
-  if (status === 'updated') {
-    return { label: 'Updated', color: 'positive' };
-  }
+const currentTotalProcesses = computed(() =>
+  selectedAuditType.value === 'rto'
+    ? rtoProcessDefinitions.length
+    : board5sProcessDefinitions.length,
+);
 
-  if (status === 'not_updated') {
-    return { label: 'Issue Found', color: 'negative' };
-  }
+function isRtoProcessValid(processKey: RtoAuditProcessKey): boolean {
+  const { status, comment } = checklistProcessState.value[processKey];
+  const file = checklistProcessFiles.value[processKey];
 
-  return { label: 'Not Started', color: 'grey-6' };
+  if (status === null) return false;
+  if (status === 'updated') return true;
+
+  return Boolean(comment.trim()) && Boolean(file);
 }
 
-function isProcessValid(processKey: AuditProcessKey) {
-  const { status, comment } = processState.value[processKey];
-  const file = processFiles.value[processKey];
+function isBoard5sProcessValid(processKey: Board5sAuditProcessKey): boolean {
+  const { status, comment } = boardProcessState.value[processKey];
+  const file = boardProcessFiles.value[processKey];
 
-  if (status === null) {
-    return false;
-  }
-
-  if (status === 'updated') {
-    return true;
-  }
+  if (status === null) return false;
+  if (status === 'updated') return true;
 
   return Boolean(comment.trim()) && Boolean(file);
 }
 
 const allProcessesValid = computed(() =>
-  processDefinitions.every((process) => isProcessValid(process.key)),
+  selectedAuditType.value === 'rto'
+    ? rtoProcessDefinitions.every((process) => isRtoProcessValid(process.key))
+    : board5sProcessDefinitions.every((process) => isBoard5sProcessValid(process.key)),
 );
 
-function onStatusChange(processKey: AuditProcessKey) {
-  if (processState.value[processKey].status === 'updated') {
-    processState.value[processKey].comment = '';
-    processFiles.value[processKey] = null;
-  }
+async function saveCurrentProcess(processKey: DualAuditProcessKey): Promise<void> {
+  await auditStore.saveProcess(selectedAuditType.value, processKey);
 }
 
-async function ensureAuditSession() {
-  if (auditId.value || !turma.value) {
-    return;
-  }
-
+async function startAudits() {
   try {
-    await auditStore.startAudit(turma.value);
+    await auditStore.startAudits();
   } catch (err: unknown) {
     pageError.value = err instanceof Error ? err.message : String(err);
   }
 }
 
-async function finishAudit() {
-  if (!allProcessesCompleted.value || !allProcessesValid.value || !auditId.value) {
+async function finishAudits() {
+  if (!allComplete.value || !allProcessesValid.value || !auditStarted.value) {
     return;
   }
 
@@ -248,8 +251,8 @@ async function finishAudit() {
   pageError.value = null;
 
   try {
-    await auditStore.finishAudit();
-    $q.notify({ type: 'positive', message: 'Audit completed successfully.' });
+    await auditStore.finishAudits();
+    $q.notify({ type: 'positive', message: 'Ambas as auditorias concluídas com sucesso.' });
     await router.push({ name: 'audit-history' });
   } catch (err: unknown) {
     pageError.value = err instanceof Error ? err.message : String(err);
@@ -258,19 +261,11 @@ async function finishAudit() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   const draft = auditStore.checkTodaysDraft();
-
-  if (draft?.turma && !turma.value) {
-    void auditStore.setTurma(draft.turma);
+  if (!draft || !auditStarted.value) {
+    await startAudits();
   }
-
-  void ensureAuditSession();
-});
-
-watch(turma, () => {
-  pageError.value = null;
-  void ensureAuditSession();
 });
 </script>
 
@@ -320,62 +315,56 @@ watch(turma, () => {
   font-size: 1rem;
 }
 
-.hero-stats {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 18px 0 20px;
-}
-
-.turma-select {
-  min-width: 220px;
-}
-
-.turma-select :deep(.q-field__native),
-.turma-select :deep(.q-field__label),
-.turma-select :deep(.q-field__marginal),
-.turma-select :deep(.q-icon) {
-  color: white;
-}
-
-.turma-select :deep(.q-field__control) {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.process-card {
-  display: flex;
-  flex-direction: column;
-  border-radius: 24px;
+.progress-card {
+  padding: 20px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
-  box-shadow: 0 18px 38px rgba(29, 49, 57, 0.08);
+  box-shadow: 0 12px 24px rgba(29, 49, 57, 0.08);
 }
 
-.process-card-disabled {
-  opacity: 0.6;
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.process-label {
+.progress-title {
+  margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
   color: #17343d;
 }
 
-.process-hint {
-  margin-top: 4px;
-  color: #5f7077;
-  font-size: 0.92rem;
+.tab-label-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-card-disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .footer-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 @media (max-width: 599px) {
   .hero-card {
     padding: 20px;
     border-radius: 22px;
+  }
+
+  .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .footer-actions {

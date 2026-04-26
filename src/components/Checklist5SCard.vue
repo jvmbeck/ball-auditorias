@@ -7,7 +7,7 @@
       </div>
 
       <p class="description q-mb-md">
-        Simula o fluxo 5S com uma checklist dedicada para os processos de produção.
+        Simula o fluxo 5S com um formulário dedicado para os processos de produção.
       </p>
 
       <div class="status-row q-mb-md">

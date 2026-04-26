@@ -9,6 +9,7 @@ import type {
   FailuresByProcessData,
   FailuresOverTimeData,
   ProcessFailureRatesData,
+  AuditType,
 } from 'src/types/audit';
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
@@ -44,6 +45,8 @@ function isStale(lastFetchedAt: number | null): boolean {
 export const useAnalyticsStore = defineStore(
   'analytics',
   () => {
+    // ── Legacy state (for backward compatibility) ──────────────────────────────
+
     const failuresOverTime = ref<FailuresOverTimeData>(EMPTY_FAILURES_OVER_TIME);
     const failuresByProcess = ref<FailuresByProcessData>(EMPTY_FAILURES_BY_PROCESS);
     const processFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
@@ -60,9 +63,39 @@ export const useAnalyticsStore = defineStore(
     const byProcessLastFetchedAt = ref<number | null>(null);
     const processFailureRateLastFetchedAt = ref<number | null>(null);
 
+    // ── Dual-type state ───────────────────────────────────────────────────────
+
+    const checklistFailuresOverTime = ref<FailuresOverTimeData>(EMPTY_FAILURES_OVER_TIME);
+    const boardFailuresOverTime = ref<FailuresOverTimeData>(EMPTY_FAILURES_OVER_TIME);
+
+    const checklistFailuresByProcess = ref<FailuresByProcessData>(EMPTY_FAILURES_BY_PROCESS);
+    const boardFailuresByProcess = ref<FailuresByProcessData>(EMPTY_FAILURES_BY_PROCESS);
+
+    const checklistProcessFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
+    const boardProcessFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
+
+    const checklistOverTimeLoading = ref(false);
+    const boardOverTimeLoading = ref(false);
+
+    const checklistByProcessLoading = ref(false);
+    const boardByProcessLoading = ref(false);
+
+    const checklistProcessFailureRateLoading = ref(false);
+    const boardProcessFailureRateLoading = ref(false);
+
+    // Request deduplication
     let overTimeRequest: Promise<void> | null = null;
     let byProcessRequest: Promise<void> | null = null;
     let processFailureRateRequest: Promise<void> | null = null;
+
+    let checklistOverTimeRequest: Promise<void> | null = null;
+    let boardOverTimeRequest: Promise<void> | null = null;
+    let checklistByProcessRequest: Promise<void> | null = null;
+    let boardByProcessRequest: Promise<void> | null = null;
+    let checklistProcessFailureRateRequest: Promise<void> | null = null;
+    let boardProcessFailureRateRequest: Promise<void> | null = null;
+
+    // ── Legacy methods (for backward compatibility) ────────────────────────
 
     async function loadFailuresOverTime(force = false): Promise<void> {
       const hasCachedData = failuresOverTime.value.labels.length > 0;
@@ -157,6 +190,135 @@ export const useAnalyticsStore = defineStore(
       return processFailureRateRequest;
     }
 
+    // ── Dual-type methods ─────────────────────────────────────────────────
+
+    async function loadFailuresOverTimeByType(type: AuditType, force = false): Promise<void> {
+      const targetRef = type === 'rto' ? checklistFailuresOverTime : boardFailuresOverTime;
+      const loadingRef = type === 'rto' ? checklistOverTimeLoading : boardOverTimeLoading;
+      const requestRef = type === 'rto' ? checklistOverTimeRequest : boardOverTimeRequest;
+
+      const hasCachedData = targetRef.value.labels.length > 0;
+
+      if (!force && hasCachedData && !isStale(overTimeLastFetchedAt.value)) {
+        return;
+      }
+
+      if (requestRef) {
+        return requestRef;
+      }
+
+      const request = (async () => {
+        loadingRef.value = true;
+
+        try {
+          targetRef.value = await fetchFailuresOverTime(type);
+        } finally {
+          loadingRef.value = false;
+          if (type === 'rto') {
+            checklistOverTimeRequest = null;
+          } else {
+            boardOverTimeRequest = null;
+          }
+        }
+      })();
+
+      if (type === 'rto') {
+        checklistOverTimeRequest = request;
+      } else {
+        boardOverTimeRequest = request;
+      }
+
+      return request;
+    }
+
+    async function loadFailuresByProcessByType(type: AuditType, force = false): Promise<void> {
+      const targetRef = type === 'rto' ? checklistFailuresByProcess : boardFailuresByProcess;
+      const loadingRef = type === 'rto' ? checklistByProcessLoading : boardByProcessLoading;
+      const requestRef = type === 'rto' ? checklistByProcessRequest : boardByProcessRequest;
+
+      const hasCachedData = targetRef.value.labels.length > 0;
+
+      if (!force && hasCachedData && !isStale(byProcessLastFetchedAt.value)) {
+        return;
+      }
+
+      if (requestRef) {
+        return requestRef;
+      }
+
+      const request = (async () => {
+        loadingRef.value = true;
+
+        try {
+          targetRef.value = await fetchFailuresByProcess(type);
+        } finally {
+          loadingRef.value = false;
+          if (type === 'rto') {
+            checklistByProcessRequest = null;
+          } else {
+            boardByProcessRequest = null;
+          }
+        }
+      })();
+
+      if (type === 'rto') {
+        checklistByProcessRequest = request;
+      } else {
+        boardByProcessRequest = request;
+      }
+
+      return request;
+    }
+
+    async function loadProcessFailureRatesByType(type: AuditType, force = false): Promise<void> {
+      const targetRef = type === 'rto' ? checklistProcessFailureRates : boardProcessFailureRates;
+      const loadingRef =
+        type === 'rto' ? checklistProcessFailureRateLoading : boardProcessFailureRateLoading;
+      const requestRef =
+        type === 'rto' ? checklistProcessFailureRateRequest : boardProcessFailureRateRequest;
+
+      const hasCachedData = targetRef.value.labels.length > 0;
+
+      if (!force && hasCachedData && !isStale(processFailureRateLastFetchedAt.value)) {
+        return;
+      }
+
+      if (requestRef) {
+        return requestRef;
+      }
+
+      const request = (async () => {
+        loadingRef.value = true;
+
+        try {
+          targetRef.value = await fetchProcessFailureRates(type);
+        } finally {
+          loadingRef.value = false;
+          if (type === 'rto') {
+            checklistProcessFailureRateRequest = null;
+          } else {
+            boardProcessFailureRateRequest = null;
+          }
+        }
+      })();
+
+      if (type === 'rto') {
+        checklistProcessFailureRateRequest = request;
+      } else {
+        boardProcessFailureRateRequest = request;
+      }
+
+      return request;
+    }
+
+    async function loadAllAnalyticsByType(type: AuditType, force = false): Promise<void> {
+      await Promise.all([
+        loadFailuresOverTimeByType(type, force),
+        loadFailuresByProcessByType(type, force),
+        loadProcessFailureRatesByType(type, force),
+      ]);
+    }
+
     async function refreshAllAnalytics(): Promise<void> {
       await Promise.all([
         loadFailuresOverTime(true),
@@ -166,6 +328,7 @@ export const useAnalyticsStore = defineStore(
     }
 
     return {
+      // Legacy
       failuresOverTime,
       failuresByProcess,
       processFailureRates,
@@ -182,18 +345,43 @@ export const useAnalyticsStore = defineStore(
       loadFailuresByProcess,
       loadProcessFailureRates,
       refreshAllAnalytics,
+      // Dual-type
+      checklistFailuresOverTime,
+      boardFailuresOverTime,
+      checklistFailuresByProcess,
+      boardFailuresByProcess,
+      checklistProcessFailureRates,
+      boardProcessFailureRates,
+      checklistOverTimeLoading,
+      boardOverTimeLoading,
+      checklistByProcessLoading,
+      boardByProcessLoading,
+      checklistProcessFailureRateLoading,
+      boardProcessFailureRateLoading,
+      loadFailuresOverTimeByType,
+      loadFailuresByProcessByType,
+      loadProcessFailureRatesByType,
+      loadAllAnalyticsByType,
     };
   },
   {
     persist: {
-      key: 'analytics-dashboard-cache-v1',
+      key: 'analytics-dashboard-cache-v2',
       pick: [
+        // Legacy
         'failuresOverTime',
         'failuresByProcess',
         'processFailureRates',
         'overTimeLastFetchedAt',
         'byProcessLastFetchedAt',
         'processFailureRateLastFetchedAt',
+        // Dual-type
+        'checklistFailuresOverTime',
+        'boardFailuresOverTime',
+        'checklistFailuresByProcess',
+        'boardFailuresByProcess',
+        'checklistProcessFailureRates',
+        'boardProcessFailureRates',
       ],
     },
   },

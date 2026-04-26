@@ -110,7 +110,7 @@ const auditStore = useAuditStore();
 
 const todaysDraft = ref<{
   auditId: string;
-  turma: 'A' | 'B' | 'C' | 'D' | null;
+  turma: 'A e C' | 'B e D' | null;
   completedCount: number;
   completed: boolean;
 } | null>(null);

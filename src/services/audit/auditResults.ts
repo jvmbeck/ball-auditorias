@@ -1,6 +1,12 @@
 import { db } from 'boot/firebase';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import type { AuditDocument, AuditResultDocument, UpdatableProcessStatus } from 'src/types/audit';
+import type {
+  AuditProcess,
+  AuditDocument,
+  RtoAuditProcessKey,
+  rtoAuditResultDocument,
+  UpdatableProcessStatus,
+} from 'src/types/audit';
 
 function toDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -29,11 +35,15 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
   const auditDate = audit.createdAt?.toDate ? audit.createdAt.toDate() : new Date();
   const dateKey = toDateKey(auditDate);
 
-  const writes = Object.entries(audit.processes).map(([processKey, process]) => {
+  const processEntries = Object.entries(audit.processes) as Array<
+    [RtoAuditProcessKey, AuditProcess]
+  >;
+
+  const writes = processEntries.map(([processKey, process]) => {
     // Use `updated` as a safe fallback for any process left in a null state at completion.
     const status = (process.status ?? 'updated') as UpdatableProcessStatus;
 
-    const payload: AuditResultDocument = {
+    const payload: rtoAuditResultDocument = {
       auditId,
       auditorId: audit.auditorId,
       turma: audit.turma,

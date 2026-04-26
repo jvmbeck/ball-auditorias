@@ -1,16 +1,22 @@
 import { db } from 'boot/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import type { FailuresOverTimeData } from 'src/types/audit';
+import type { FailuresOverTimeData, AuditType } from 'src/types/audit';
 import { toDateKey } from 'src/utils/dateFormatting';
 
+function getResultsCollection(type?: AuditType): string {
+  if (type === 'rto') return 'rtoProcessResults';
+  if (type === 'board5s') return 'board5sProcessResults';
+  return 'auditResults'; // Legacy fallback
+}
+
 /**
- * Fetches and aggregates failed process records from `auditResults` for the last 30 days.
+ * Fetches and aggregates failed process records from the appropriate results collection.
+ * Supports both legacy (auditResults) and dual-type (rtoProcessResults, board5sProcessResults).
  *
- * The Firestore query only filters by date to keep indexing simple; `hasIssue` is filtered in code.
- *
+ * @param type Optional audit type ('rto' or 'board5s'). If omitted, uses legacy collection.
  * @returns Date labels and failure counts for a line chart
  */
-export async function fetchFailuresOverTime(): Promise<FailuresOverTimeData> {
+export async function fetchFailuresOverTime(type?: AuditType): Promise<FailuresOverTimeData> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -28,7 +34,8 @@ export async function fetchFailuresOverTime(): Promise<FailuresOverTimeData> {
     failuresByDate[toDateKey(current)] = 0;
   }
 
-  const resultsQuery = query(collection(db, 'auditResults'), where('date', '>=', startDateKey));
+  const collectionName = getResultsCollection(type);
+  const resultsQuery = query(collection(db, collectionName), where('date', '>=', startDateKey));
   const snapshots = await getDocs(resultsQuery);
 
   snapshots.forEach((snapshot) => {

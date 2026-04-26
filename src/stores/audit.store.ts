@@ -97,7 +97,7 @@ export const useAuditStore = defineStore(
     const auditId = ref<string | null>(null);
 
     /** Selected work shift responsible for the audit. */
-    const turma = ref<'A' | 'B' | 'C' | 'D' | null>(null);
+    const turma = ref<'A e C' | 'B e D' | null>(null);
 
     /** Per-process status and comment, edited directly by the UI. */
     const processState = reactive<ProcessState>(buildInitialProcessState());
@@ -139,7 +139,7 @@ export const useAuditStore = defineStore(
     const draftCompletedAuditId = ref<string | null>(null);
 
     /** Turma captured at completion time (mirrors the same need as `draftCompletedAuditId`). */
-    const draftCompletedTurma = ref<'A' | 'B' | 'C' | 'D' | null>(null);
+    const draftCompletedTurma = ref<'A e C' | 'B e D' | null>(null);
 
     // ── Computed ─────────────────────────────────────────────────────────────
 
@@ -203,7 +203,7 @@ export const useAuditStore = defineStore(
      * On reload, re-attaches to today's in-progress audit and restores
      * persisted process state when the draft belongs to the same audit.
      */
-    async function startAudit(selectedTurma: 'A' | 'B' | 'C' | 'D'): Promise<void> {
+    async function startAudit(selectedTurma: 'A e C' | 'B e D'): Promise<void> {
       const auditorId = authStore.firebaseUser?.uid;
 
       if (!auditorId) {
@@ -330,7 +330,7 @@ export const useAuditStore = defineStore(
      */
     function checkTodaysDraft(): {
       auditId: string;
-      turma: 'A' | 'B' | 'C' | 'D' | null;
+      turma: 'A e C' | 'B e D' | null;
       completedCount: number;
       completed: boolean;
     } | null {
@@ -355,10 +355,15 @@ export const useAuditStore = defineStore(
 
       const count = PROCESS_KEYS.filter((key) => processState[key]?.status !== null).length;
 
-      return { auditId: auditId.value, turma: turma.value, completedCount: count, completed: false };
+      return {
+        auditId: auditId.value,
+        turma: turma.value,
+        completedCount: count,
+        completed: false,
+      };
     }
 
-    async function setTurma(value: 'A' | 'B' | 'C' | 'D' | null) {
+    async function setTurma(value: 'A e C' | 'B e D' | null) {
       turma.value = value;
 
       if (!value || !auditId.value) {

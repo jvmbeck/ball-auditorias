@@ -34,6 +34,8 @@ const PROCESS_KEYS: AuditProcessKey[] = [
 
 const TOTAL_PROCESSES = PROCESS_KEYS.length;
 
+type GroupedTurma = 'A e C' | 'B e D';
+
 function getLocalDayRange() {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
@@ -53,8 +55,8 @@ function getAuditCalendarMetadata(referenceDate = new Date()) {
   return { dayOfWeek, yearMonth };
 }
 
-function parseTurma(value: unknown): 'A' | 'B' | 'C' | 'D' | null {
-  if (value === 'A' || value === 'B' || value === 'C' || value === 'D') {
+function parseTurma(value: unknown): GroupedTurma | null {
+  if (value === 'A e C' || value === 'B e D') {
     return value;
   }
 
@@ -103,10 +105,7 @@ function assertProcessKey(processKey: string): asserts processKey is AuditProces
  * @param auditorId Authenticated auditor identifier creating the audit
  * @returns The generated Firestore audit document ID
  */
-export async function createAudit(
-  auditorId: string,
-  turma: 'A' | 'B' | 'C' | 'D',
-): Promise<string> {
+export async function createAudit(auditorId: string, turma: GroupedTurma): Promise<string> {
   const { dayOfWeek, yearMonth } = getAuditCalendarMetadata();
 
   const payload: NewAuditDocument = {
@@ -248,10 +247,7 @@ export async function updateProcess(
  * @param auditId Audit document ID
  * @param turma New responsible turma
  */
-export async function updateAuditTurma(
-  auditId: string,
-  turma: 'A' | 'B' | 'C' | 'D',
-): Promise<void> {
+export async function updateAuditTurma(auditId: string, turma: GroupedTurma): Promise<void> {
   const auditRef = doc(db, 'audits', auditId);
   await updateDoc(auditRef, { turma });
 }

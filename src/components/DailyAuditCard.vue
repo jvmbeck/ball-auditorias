@@ -39,18 +39,7 @@
           </div>
 
           <div class="progress-row">
-            <span class="progress-label">
-              {{ todaysDraft.completedCount }} / {{ TOTAL_PROCESSES }} processos revisados
-            </span>
-
-            <q-linear-progress
-              rounded
-              size="10px"
-              color="primary"
-              track-color="grey-3"
-              :value="todaysDraft.completedCount / TOTAL_PROCESSES"
-              class="q-mt-sm"
-            />
+            <span class="progress-label"> Auditoria iniciada e em andamento </span>
           </div>
         </div>
         <div class="status-row">
@@ -102,21 +91,18 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useAuditStore } from 'src/stores/audit.store';
+import { checkTodaysAudit } from 'src/services/audit/auditResults';
 
 const TOTAL_PROCESSES = 6;
-
-const auditStore = useAuditStore();
 
 const todaysDraft = ref<{
   auditId: string;
   turma: 'A e C' | 'B e D' | null;
-  completedCount: number;
   completed: boolean;
 } | null>(null);
 
-onMounted(() => {
-  todaysDraft.value = auditStore.checkTodaysDraft();
+onMounted(async () => {
+  todaysDraft.value = await checkTodaysAudit();
 });
 </script>
 

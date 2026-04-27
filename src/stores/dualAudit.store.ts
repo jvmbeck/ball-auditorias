@@ -7,6 +7,8 @@ import type {
   AuditType,
   Board5sAuditProcessKey,
   DualAuditProcessKey,
+  PrinterCheckKey,
+  PrinterChecks,
   RtoAuditProcessKey,
   UpdatableProcessStatus,
 } from 'src/types/audit';
@@ -25,6 +27,9 @@ type RtoProcessState = GenericProcessState<RtoAuditProcessKey>;
 type Board5sProcessState = GenericProcessState<Board5sAuditProcessKey>;
 type RtoProcessFiles = GenericProcessFiles<RtoAuditProcessKey>;
 type Board5sProcessFiles = GenericProcessFiles<Board5sAuditProcessKey>;
+
+type PrinterProcessState = Record<PrinterCheckKey, ProcessEntry>;
+type PrinterProcessFiles = Record<PrinterCheckKey, File | null>;
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -46,6 +51,8 @@ const BOARD5S_PROCESS_KEYS: Board5sAuditProcessKey[] = [
   'printer1',
   'printer2e3',
 ];
+
+const PRINTER_CHECK_KEYS: PrinterCheckKey[] = ['printer1', 'printer2', 'printer3'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -75,6 +82,20 @@ function buildInitialProcessFiles<TKey extends string>(
   }, {} as GenericProcessFiles<TKey>);
 }
 
+function buildInitialPrinterProcessState(): PrinterProcessState {
+  return PRINTER_CHECK_KEYS.reduce<PrinterProcessState>((acc, key) => {
+    acc[key] = { status: null, comment: '' };
+    return acc;
+  }, {} as PrinterProcessState);
+}
+
+function buildInitialPrinterProcessFiles(): PrinterProcessFiles {
+  return PRINTER_CHECK_KEYS.reduce<PrinterProcessFiles>((acc, key) => {
+    acc[key] = null;
+    return acc;
+  }, {} as PrinterProcessFiles);
+}
+
 function isProcessReadyForSave<TKey extends string>(
   processState: GenericProcessState<TKey>,
   processFiles: GenericProcessFiles<TKey>,
@@ -94,6 +115,75 @@ function isProcessReadyForSave<TKey extends string>(
   return Boolean(comment.trim()) && Boolean(file);
 }
 
+function isPrinterReadyForSave(
+  printerState: PrinterProcessState,
+  printerFiles: PrinterProcessFiles,
+): boolean {
+  return PRINTER_CHECK_KEYS.every((printerKey) => {
+    const { status, comment } = printerState[printerKey];
+    const file = printerFiles[printerKey];
+
+    if (status === null) {
+      return false;
+    }
+
+    if (status === 'updated') {
+      return true;
+    }
+
+    return Boolean(comment.trim()) && Boolean(file);
+  });
+}
+
+function getPrinterAggregateStatus(printerState: PrinterProcessState): AuditProcessStatus {
+  const statuses = PRINTER_CHECK_KEYS.map((printerKey) => printerState[printerKey].status);
+
+  if (statuses.some((status) => status === null)) {
+    return null;
+  }
+
+  return statuses.some((status) => status === 'not_updated') ? 'not_updated' : 'updated';
+}
+
+function buildPrinterChecksPayload(printerState: PrinterProcessState): PrinterChecks {
+  return PRINTER_CHECK_KEYS.reduce<PrinterChecks>((acc, printerKey) => {
+    const { status, comment } = printerState[printerKey];
+
+    acc[printerKey] = {
+      status,
+      comment: status === 'not_updated' ? comment.trim() || null : null,
+      imageUrl: null,
+    };
+
+    return acc;
+  }, {} as PrinterChecks);
+}
+
+function buildPrinterIssueTargets(printerState: PrinterProcessState): PrinterCheckKey[] {
+  return PRINTER_CHECK_KEYS.filter(
+    (printerKey) => printerState[printerKey].status === 'not_updated',
+  );
+}
+
+function buildPrinterSummaryComment(printerState: PrinterProcessState): string | null {
+  const issueSummaries = PRINTER_CHECK_KEYS.flatMap((printerKey) => {
+    if (printerState[printerKey].status !== 'not_updated') {
+      return [];
+    }
+
+    const label = printerKey.replace('printer', 'Printer ');
+    const comment = printerState[printerKey].comment.trim();
+
+    return [comment ? `${label}: ${comment}` : label];
+  });
+
+  if (!issueSummaries.length) {
+    return null;
+  }
+
+  return issueSummaries.join('; ');
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────
 
 export const useDualAuditStore = defineStore(
@@ -111,6 +201,8 @@ export const useDualAuditStore = defineStore(
     const checklistProcessFiles = reactive<RtoProcessFiles>(
       buildInitialProcessFiles(RTO_PROCESS_KEYS),
     );
+    const checklistPrinterState = reactive<PrinterProcessState>(buildInitialPrinterProcessState());
+    const checklistPrinterFiles = reactive<PrinterProcessFiles>(buildInitialPrinterProcessFiles());
 
     // Board audit
     const boardAuditId = ref<string | null>(null);
@@ -137,7 +229,16 @@ export const useDualAuditStore = defineStore(
     // ── Computed (per type) ───────────────────────────────────────────────
 
     const checklistCompletedCount = computed<number>(
-      () => RTO_PROCESS_KEYS.filter((key) => checklistProcessState[key].status !== null).length,
+      () =>
+        RTO_PROCESS_KEYS.filter((key) => {
+          if (key === 'printer') {
+            return PRINTER_CHECK_KEYS.every(
+              (printerKey) => checklistPrinterState[printerKey].status !== null,
+            );
+          }
+
+          return checklistProcessState[key].status !== null;
+        }).length,
     );
 
     const boardCompletedCount = computed<number>(
@@ -172,6 +273,11 @@ export const useDualAuditStore = defineStore(
         checklistProcessFiles[key] = null;
       });
 
+      PRINTER_CHECK_KEYS.forEach((printerKey) => {
+        checklistPrinterState[printerKey] = { status: null, comment: '' };
+        checklistPrinterFiles[printerKey] = null;
+      });
+
       BOARD5S_PROCESS_KEYS.forEach((key) => {
         boardProcessState[key] = { status: null, comment: '' };
         boardProcessFiles[key] = null;
@@ -200,6 +306,39 @@ export const useDualAuditStore = defineStore(
 
         if (!auditId) {
           throw new Error('Cannot save process: no active rto audit.');
+        }
+
+        if (rtoProcessKey === 'printer') {
+          if (!isPrinterReadyForSave(checklistPrinterState, checklistPrinterFiles)) {
+            throw new Error('Cannot save process "printer": complete Printer 1, 2, and 3 first.');
+          }
+
+          const printerStatus = getPrinterAggregateStatus(checklistPrinterState);
+
+          if (!printerStatus) {
+            throw new Error('Cannot save process "printer": status not set.');
+          }
+
+          await checklistAuditService.updateProcess(
+            auditId,
+            sessionId,
+            turma.value,
+            rtoProcessKey,
+            printerStatus as UpdatableProcessStatus,
+            buildPrinterSummaryComment(checklistPrinterState),
+            null,
+            {
+              issueTargets: buildPrinterIssueTargets(checklistPrinterState),
+              printerChecks: buildPrinterChecksPayload(checklistPrinterState),
+              printerFiles: checklistPrinterFiles,
+            },
+          );
+
+          PRINTER_CHECK_KEYS.forEach((printerKey) => {
+            checklistPrinterFiles[printerKey] = null;
+          });
+
+          return;
         }
 
         const { status, comment } = checklistProcessState[rtoProcessKey];
@@ -336,7 +475,11 @@ export const useDualAuditStore = defineStore(
 
       // Validate all RTO processes
       for (const processKey of RTO_PROCESS_KEYS) {
-        if (!isProcessReadyForSave(checklistProcessState, checklistProcessFiles, processKey)) {
+        if (
+          processKey === 'printer'
+            ? !isPrinterReadyForSave(checklistPrinterState, checklistPrinterFiles)
+            : !isProcessReadyForSave(checklistProcessState, checklistProcessFiles, processKey)
+        ) {
           throw new Error(`Checklist: ${processKey} is incomplete.`);
         }
       }
@@ -426,6 +569,8 @@ export const useDualAuditStore = defineStore(
       boardProcessState,
       checklistProcessFiles,
       boardProcessFiles,
+      checklistPrinterState,
+      checklistPrinterFiles,
       loading,
       error,
       turma,
@@ -450,6 +595,7 @@ export const useDualAuditStore = defineStore(
         'checklistAuditId',
         'boardAuditId',
         'checklistProcessState',
+        'checklistPrinterState',
         'boardProcessState',
         'turma',
         'draftDate',

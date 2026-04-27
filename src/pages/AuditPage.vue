@@ -118,7 +118,21 @@
           class="col-12 col-md-6 col-xl-4"
           :class="{ 'process-card-disabled': !selectedTurma || !auditStarted }"
         >
+          <PrinterProcessCard
+            v-if="selectedAuditType === 'rto' && process.key === 'printer'"
+            :label="process.label"
+            :checks="checklistPrinterState"
+            :files="checklistPrinterFiles"
+            :is-saved="checklistSavedProcesses[process.key as RtoAuditProcessKey]"
+            :loading="loading"
+            @update:checks="Object.assign(checklistPrinterState, $event)"
+            @update:files="Object.assign(checklistPrinterFiles, $event)"
+            @update:is-saved="checklistSavedProcesses[process.key as RtoAuditProcessKey] = $event"
+            @save="saveCurrentProcess(process.key)"
+          />
+
           <ProcessCard
+            v-else
             :process-key="process.key"
             :label="process.label"
             :model-value="
@@ -180,11 +194,13 @@ import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import { useDualAuditStore } from 'src/stores/dualAudit.store';
 import ProcessCard from 'src/components/ProcessCard.vue';
+import PrinterProcessCard from 'src/components/PrinterProcessCard.vue';
 import { getProcessSavedStatus } from 'src/services/audit/auditProcessResults';
 import type {
   AuditType,
   Board5sAuditProcessKey,
   DualAuditProcessKey,
+  PrinterCheckKey,
   RtoAuditProcessKey,
 } from 'src/types/audit';
 
@@ -218,6 +234,8 @@ const {
   boardProcessState,
   checklistProcessFiles,
   boardProcessFiles,
+  checklistPrinterState,
+  checklistPrinterFiles,
   loading,
   turma,
   checklistCompletedCount,
@@ -279,9 +297,20 @@ const currentTotalProcesses = computed(() =>
 );
 
 function isRtoProcessValid(processKey: RtoAuditProcessKey): boolean {
+  if (processKey === 'printer') {
+    return (['printer1', 'printer2', 'printer3'] as PrinterCheckKey[]).every((printerKey) => {
+      const { status, comment } = checklistPrinterState.value[printerKey];
+      const file = checklistPrinterFiles.value[printerKey];
+
+      if (status === null) return false;
+      if (status === 'updated') return true;
+
+      return Boolean(comment.trim()) && Boolean(file);
+    });
+  }
+
   const { status, comment } = checklistProcessState.value[processKey];
   const file = checklistProcessFiles.value[processKey];
-
   if (status === null) return false;
   if (status === 'updated') return true;
 
@@ -307,7 +336,6 @@ const allProcessesValid = computed(() =>
 async function saveCurrentProcess(processKey: DualAuditProcessKey): Promise<void> {
   await auditStore.saveProcess(selectedAuditType.value, processKey);
 
-  // Mark the process as saved
   if (selectedAuditType.value === 'rto') {
     checklistSavedProcesses.value[processKey as RtoAuditProcessKey] = true;
   } else {

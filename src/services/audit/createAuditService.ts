@@ -13,8 +13,16 @@ import type {
   DualAuditProcessKey,
   DualTypeAuditDocument,
   DualTypeAuditResultDocument,
+  PrinterCheckKey,
+  PrinterChecks,
   UpdatableProcessStatus,
 } from 'src/types/audit';
+
+interface UpdateProcessOptions {
+  issueTargets?: PrinterCheckKey[];
+  printerChecks?: PrinterChecks;
+  printerFiles?: Partial<Record<PrinterCheckKey, File | null>>;
+}
 
 /**
  * Creates a reusable audit service factory that handles all database operations
@@ -33,9 +41,11 @@ export function createAuditService(config: AuditServiceConfig) {
     auditId: string,
     processKey: DualAuditProcessKey,
     file: File,
+    evaluationType?: string,
   ): Promise<string> {
     const fileName = `${Date.now()}.jpg`;
-    const storagePath = `audits/${config.auditCollection}/${auditId}/${processKey}/${fileName}`;
+    const evaluationPath = evaluationType ? `/${evaluationType}` : '';
+    const storagePath = `audits/${config.auditCollection}/${auditId}/${processKey}${evaluationPath}/${fileName}`;
     const imageRef = ref(storage, storagePath);
 
     await uploadBytes(imageRef, file);
@@ -93,12 +103,44 @@ export function createAuditService(config: AuditServiceConfig) {
     status: UpdatableProcessStatus,
     comment: string | null = null,
     imageFile: File | null = null,
+    options?: UpdateProcessOptions,
   ): Promise<void> {
     let imageUrl: string | null = null;
+    let printerChecks = options?.printerChecks ?? null;
 
     // Upload image if provided
     if (imageFile) {
       imageUrl = await uploadImage(auditId, processKey, imageFile);
+    }
+
+    if (printerChecks && options?.printerFiles) {
+      const uploadedPrinterChecks = await Promise.all(
+        Object.entries(printerChecks).map(async ([printerKey, printerCheck]) => {
+          const typedPrinterKey = printerKey as PrinterCheckKey;
+          const printerFile = options.printerFiles?.[typedPrinterKey] ?? null;
+
+          if (printerCheck.status === 'not_updated' && printerFile) {
+            const printerImageUrl = await uploadImage(
+              auditId,
+              processKey,
+              printerFile,
+              typedPrinterKey,
+            );
+
+            return [
+              typedPrinterKey,
+              {
+                ...printerCheck,
+                imageUrl: printerImageUrl,
+              },
+            ] as const;
+          }
+
+          return [typedPrinterKey, printerCheck] as const;
+        }),
+      );
+
+      printerChecks = Object.fromEntries(uploadedPrinterChecks) as PrinterChecks;
     }
 
     // Determine if this process has an issue
@@ -115,6 +157,8 @@ export function createAuditService(config: AuditServiceConfig) {
       hasIssue,
       comment: hasIssue ? comment?.trim() || null : null,
       imageUrl: hasIssue ? imageUrl : null,
+      printerChecks,
+      issueTargets: options?.issueTargets ?? [],
       createdAt: serverTimestamp(),
     };
 

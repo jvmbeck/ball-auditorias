@@ -4,6 +4,8 @@ export type AuditStatus = 'in_progress' | 'completed';
 
 export type AuditType = 'rto' | 'board5s';
 
+export type PrinterCheckKey = 'printer1' | 'printer2' | 'printer3';
+
 export type RtoAuditProcessKey =
   | 'frontEnd'
   | 'lavadora'
@@ -30,10 +32,20 @@ export type rtoAuditProcessKey = AuditProcessKey;
 
 export type AuditProcessStatus = 'updated' | 'not_updated' | null;
 
+export interface PrinterCheckResult {
+  status: AuditProcessStatus;
+  comment?: string | null;
+  imageUrl?: string | null;
+}
+
+export type PrinterChecks = Record<PrinterCheckKey, PrinterCheckResult>;
+
 export interface AuditProcess {
   status: AuditProcessStatus;
   comment?: string | null;
   imageUrl?: string | null;
+  printerChecks?: PrinterChecks | null;
+  issueTargets?: PrinterCheckKey[];
 }
 
 export type AuditProcesses = Record<AuditProcessKey, AuditProcess>;
@@ -135,6 +147,8 @@ export interface DualTypeAuditResultDocument {
   hasIssue: boolean; // status === 'not_updated'
   comment?: string | null;
   imageUrl?: string | null;
+  printerChecks?: PrinterChecks | null;
+  issueTargets?: PrinterCheckKey[];
   createdAt: FieldValue;
 }
 

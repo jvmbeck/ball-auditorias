@@ -85,8 +85,31 @@
         />
       </section>
 
+      <!-- Process Cards Loading Placeholder -->
+      <div v-if="isStartingAudits" class="row q-col-gutter-lg q-mb-xl">
+        <div
+          v-for="n in currentTotalProcesses"
+          :key="`process-skeleton-${n}`"
+          class="col-12 col-md-6 col-xl-4"
+        >
+          <q-card flat bordered class="process-skeleton-card full-height">
+            <q-card-section>
+              <q-skeleton type="text" width="55%" class="q-mb-sm" />
+              <q-skeleton type="text" width="85%" />
+            </q-card-section>
+            <q-card-section>
+              <q-skeleton type="rect" height="28px" class="q-mb-sm" />
+              <q-skeleton type="rect" height="28px" class="q-mb-sm" />
+            </q-card-section>
+            <q-card-section>
+              <q-skeleton type="QBtn" width="110px" />
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+
       <!-- Process Cards Grid -->
-      <div class="row q-col-gutter-lg q-mb-xl">
+      <div v-else class="row q-col-gutter-lg q-mb-xl">
         <div
           v-for="process in selectedAuditType === 'rto'
             ? rtoProcessDefinitions
@@ -108,6 +131,11 @@
                 ? checklistProcessFiles[process.key as RtoAuditProcessKey]
                 : boardProcessFiles[process.key as Board5sAuditProcessKey]
             "
+            :is-saved="
+              selectedAuditType === 'rto'
+                ? checklistSavedProcesses[process.key as RtoAuditProcessKey]
+                : boardSavedProcesses[process.key as Board5sAuditProcessKey]
+            "
             :loading="loading"
             @update:model-value="
               selectedAuditType === 'rto'
@@ -118,6 +146,11 @@
               selectedAuditType === 'rto'
                 ? (checklistProcessFiles[process.key as RtoAuditProcessKey] = $event)
                 : (boardProcessFiles[process.key as Board5sAuditProcessKey] = $event)
+            "
+            @update:is-saved="
+              selectedAuditType === 'rto'
+                ? (checklistSavedProcesses[process.key as RtoAuditProcessKey] = $event)
+                : (boardSavedProcesses[process.key as Board5sAuditProcessKey] = $event)
             "
             @save="saveCurrentProcess(process.key)"
           />
@@ -141,12 +174,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import { useDualAuditStore } from 'src/stores/dualAudit.store';
 import ProcessCard from 'src/components/ProcessCard.vue';
+import { getProcessSavedStatus } from 'src/services/audit/auditProcessResults';
 import type {
   AuditType,
   Board5sAuditProcessKey,
@@ -207,9 +241,32 @@ const selectedAuditType = ref<AuditType>('rto');
 const isFinishing = ref(false);
 const pageError = ref<string | null>(null);
 
+// Track which processes have been saved to Firestore
+const checklistSavedProcesses = ref<Record<RtoAuditProcessKey, boolean>>({
+  frontEnd: false,
+  lavadora: false,
+  printer: false,
+  necker: false,
+  insideSpray: false,
+  paletizadora: false,
+});
+
+const boardSavedProcesses = ref<Record<Board5sAuditProcessKey, boolean>>({
+  minsters: false,
+  bodyMakers11to14: false,
+  bodyMakers15to18: false,
+  bodyMakers19to23: false,
+  bodyMakers24to31: false,
+  printer1: false,
+  printer2e3: false,
+});
+
 const auditStarted = computed(() => checklistAuditId.value !== null && boardAuditId.value !== null);
 
 const isBusy = computed(() => loading.value || isFinishing.value);
+const isStartingAudits = computed(
+  () => Boolean(selectedTurma.value) && !auditStarted.value && loading.value,
+);
 
 const currentCompletedCount = computed(() =>
   selectedAuditType.value === 'rto' ? checklistCompletedCount.value : boardCompletedCount.value,
@@ -249,6 +306,13 @@ const allProcessesValid = computed(() =>
 
 async function saveCurrentProcess(processKey: DualAuditProcessKey): Promise<void> {
   await auditStore.saveProcess(selectedAuditType.value, processKey);
+
+  // Mark the process as saved
+  if (selectedAuditType.value === 'rto') {
+    checklistSavedProcesses.value[processKey as RtoAuditProcessKey] = true;
+  } else {
+    boardSavedProcesses.value[processKey as Board5sAuditProcessKey] = true;
+  }
 }
 
 async function startAudits() {
@@ -280,9 +344,35 @@ async function finishAudits() {
 
 onMounted(async () => {
   const draft = auditStore.checkTodaysDraft();
-  if (!draft || !auditStarted.value) {
+
+  if (!draft && selectedTurma.value && !auditStarted.value) {
     await startAudits();
   }
+
+  // Load saved process states from Firestore
+  if (checklistAuditId.value) {
+    checklistSavedProcesses.value = await getProcessSavedStatus(
+      'rtoProcessResults',
+      checklistAuditId.value,
+      rtoProcessDefinitions.map((p) => p.key),
+    );
+  }
+
+  if (boardAuditId.value) {
+    boardSavedProcesses.value = await getProcessSavedStatus(
+      'board5sProcessResults',
+      boardAuditId.value,
+      board5sProcessDefinitions.map((p) => p.key),
+    );
+  }
+});
+
+watch(selectedTurma, async (value) => {
+  if (!value || auditStarted.value || loading.value) {
+    return;
+  }
+
+  await startAudits();
 });
 </script>
 
@@ -365,6 +455,12 @@ onMounted(async () => {
 .process-card-disabled {
   opacity: 0.6;
   pointer-events: none;
+}
+
+.process-skeleton-card {
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 38px rgba(29, 49, 57, 0.08);
 }
 
 .footer-actions {

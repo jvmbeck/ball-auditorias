@@ -55,11 +55,13 @@ export function createAuditService(config: AuditServiceConfig) {
   async function createAudit(
     auditSessionId: string,
     date: string,
+    turma: 'A e C' | 'B e D',
     inspector: string,
   ): Promise<string> {
     const payload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } = {
       auditSessionId,
       date,
+      turma,
       inspector,
       createdAt: serverTimestamp(),
     };
@@ -86,6 +88,7 @@ export function createAuditService(config: AuditServiceConfig) {
   async function updateProcess(
     auditId: string,
     auditSessionId: string,
+    turma: 'A e C' | 'B e D',
     processKey: DualAuditProcessKey,
     status: UpdatableProcessStatus,
     comment: string | null = null,
@@ -106,6 +109,7 @@ export function createAuditService(config: AuditServiceConfig) {
       auditId,
       auditSessionId,
       date: auditId,
+      turma,
       process: processKey,
       status,
       hasIssue,

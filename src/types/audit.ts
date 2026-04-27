@@ -96,6 +96,12 @@ export interface ProcessFailureRatesData {
   failuresByProcess: Record<string, number>;
 }
 
+export interface FailuresByProcessAndTurmaData {
+  labels: string[];
+  seriesAC: number[];
+  seriesBD: number[];
+}
+
 /** Write-side shape for a single analytics record in a process-results collection. */
 export interface rtoAuditResultDocument {
   auditId: string;

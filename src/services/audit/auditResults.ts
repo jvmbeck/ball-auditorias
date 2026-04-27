@@ -1,17 +1,29 @@
 import { db } from 'boot/firebase';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import type {
   AuditProcess,
   AuditDocument,
   RtoAuditProcessKey,
   rtoAuditResultDocument,
   UpdatableProcessStatus,
+  DualTypeAuditDocument,
 } from 'src/types/audit';
 
 function toDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Gets today's date in YYYY-MM-DD format to match Firestore document IDs
+ */
+function getTodayDateString(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -65,4 +77,35 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
 
   // Fan out all writes in parallel — each process is independent.
   await Promise.all(writes);
+}
+
+/**
+ * Checks if an audit document exists for today in either collection.
+ * Returns information about the first audit found with its completion status.
+ *
+ * @returns Object with auditId, turma, and completed status; null if no audit found
+ */
+export async function checkTodaysAudit(): Promise<{
+  auditId: string;
+  turma: 'A e C' | 'B e D' | null;
+  completed: boolean;
+} | null> {
+  const dateString = getTodayDateString();
+  const collectionsToCheck = ['rtoAudits', 'board5sAudits'];
+
+  for (const collectionName of collectionsToCheck) {
+    const docRef = doc(db, collectionName, dateString);
+    const docSnapshot = await getDoc(docRef);
+
+    if (docSnapshot.exists()) {
+      const data = docSnapshot.data() as DualTypeAuditDocument;
+      return {
+        auditId: dateString,
+        turma: data.turma || null,
+        completed: !!data.completedAt,
+      };
+    }
+  }
+
+  return null;
 }

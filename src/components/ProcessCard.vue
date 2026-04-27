@@ -2,15 +2,29 @@
   <q-card flat bordered class="process-card full-height">
     <q-card-section class="row items-start justify-between q-gutter-sm">
       <div>
-        <div class="process-label">{{ label }}</div>
+        <div class="process-title">
+          <div class="process-label">{{ label }}</div>
+          <q-icon
+            v-if="isSaved && modelValue.status !== null"
+            name="check_circle"
+            color="positive"
+            size="28px"
+            class="q-mr-xs"
+          >
+            <q-tooltip anchor="top middle" self="bottom middle">Salvo no banco de dados</q-tooltip>
+          </q-icon>
+        </div>
+
         <div class="process-hint">
           Selecione o resultado. Salve o processo para registrar a atualização.
         </div>
       </div>
 
-      <q-chip dense :color="statusChip.color" text-color="white">
-        {{ statusChip.label }}
-      </q-chip>
+      <div class="status-icons">
+        <q-chip dense :color="statusChip.color" text-color="white">
+          {{ statusChip.label }}
+        </q-chip>
+      </div>
     </q-card-section>
 
     <q-card-section>
@@ -64,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 
 interface ProcessValue {
   status: 'updated' | 'not_updated' | null;
@@ -77,13 +91,26 @@ const props = defineProps<{
   modelValue: ProcessValue;
   file: File | null;
   loading: boolean;
+  isSaved: boolean;
 }>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: ProcessValue];
   'update:file': [file: File | null];
+  'update:isSaved': [isSaved: boolean];
   save: [];
 }>();
+
+// Reset saved state when modelValue changes
+watch(
+  () => props.modelValue,
+  () => {
+    if (props.isSaved) {
+      emit('update:isSaved', false);
+    }
+  },
+  { deep: true },
+);
 
 const statusOptions = [
   { label: 'Atualizado', value: 'updated' },
@@ -142,6 +169,12 @@ function onFileChange(value: File | null) {
   box-shadow: 0 18px 38px rgba(29, 49, 57, 0.08);
 }
 
+.process-title {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
 .process-label {
   font-size: 1.2rem;
   font-weight: 700;
@@ -152,5 +185,11 @@ function onFileChange(value: File | null) {
   margin-top: 4px;
   color: #5f7077;
   font-size: 0.92rem;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

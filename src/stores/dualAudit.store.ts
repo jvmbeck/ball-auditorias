@@ -124,6 +124,7 @@ export const useDualAuditStore = defineStore(
     // Common state
     const loading = ref(false);
     const error = ref<string | null>(null);
+    const turma = ref<'A e C' | 'B e D' | null>(null);
 
     // ── Draft metadata ────────────────────────────────────────────────────
 
@@ -163,6 +164,7 @@ export const useDualAuditStore = defineStore(
       checklistAuditId.value = null;
       boardAuditId.value = null;
       error.value = null;
+      turma.value = null;
 
       // Reset all process state
       RTO_PROCESS_KEYS.forEach((key) => {
@@ -188,6 +190,10 @@ export const useDualAuditStore = defineStore(
 
       const sessionId = getTodayKey(); // Use date as session ID
 
+      if (!turma.value) {
+        throw new Error('Cannot save process: turma not selected.');
+      }
+
       if (isRtoAudit) {
         const rtoProcessKey = processKey as RtoAuditProcessKey;
         const auditId = checklistAuditId.value;
@@ -206,6 +212,7 @@ export const useDualAuditStore = defineStore(
         await checklistAuditService.updateProcess(
           auditId,
           sessionId,
+          turma.value,
           rtoProcessKey,
           status as UpdatableProcessStatus,
           comment || null,
@@ -233,6 +240,7 @@ export const useDualAuditStore = defineStore(
       await boardAuditService.updateProcess(
         auditId,
         sessionId,
+        turma.value,
         boardProcessKey,
         status as UpdatableProcessStatus,
         comment || null,
@@ -255,6 +263,10 @@ export const useDualAuditStore = defineStore(
         throw new Error('Cannot start audits: no authenticated user.');
       }
 
+      if (!turma.value) {
+        throw new Error('Cannot start audits: select turma before starting.');
+      }
+
       loading.value = true;
       error.value = null;
 
@@ -264,8 +276,8 @@ export const useDualAuditStore = defineStore(
 
         // Create both audits in parallel
         const [checklistId, boardId] = await Promise.all([
-          checklistAuditService.createAudit(sessionId, today, auditorId),
-          boardAuditService.createAudit(sessionId, today, auditorId),
+          checklistAuditService.createAudit(sessionId, today, turma.value, auditorId),
+          boardAuditService.createAudit(sessionId, today, turma.value, auditorId),
         ]);
 
         checklistAuditId.value = checklistId;
@@ -279,6 +291,10 @@ export const useDualAuditStore = defineStore(
       } finally {
         loading.value = false;
       }
+    }
+
+    function setTurma(value: 'A e C' | 'B e D' | null): void {
+      turma.value = value;
     }
 
     /**
@@ -412,6 +428,7 @@ export const useDualAuditStore = defineStore(
       boardProcessFiles,
       loading,
       error,
+      turma,
       // Computed
       checklistCompletedCount,
       boardCompletedCount,
@@ -420,6 +437,7 @@ export const useDualAuditStore = defineStore(
       allComplete,
       // Actions
       startAudits,
+      setTurma,
       saveProcess,
       finishAudits,
       checkTodaysDraft,
@@ -433,6 +451,7 @@ export const useDualAuditStore = defineStore(
         'boardAuditId',
         'checklistProcessState',
         'boardProcessState',
+        'turma',
         'draftDate',
         'draftAuditorId',
         'draftCompleted',

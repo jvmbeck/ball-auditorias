@@ -334,12 +334,29 @@ const allProcessesValid = computed(() =>
 );
 
 async function saveCurrentProcess(processKey: DualAuditProcessKey): Promise<void> {
-  await auditStore.saveProcess(selectedAuditType.value, processKey);
+  pageError.value = null;
 
-  if (selectedAuditType.value === 'rto') {
-    checklistSavedProcesses.value[processKey as RtoAuditProcessKey] = true;
-  } else {
-    boardSavedProcesses.value[processKey as Board5sAuditProcessKey] = true;
+  try {
+    await auditStore.saveProcess(selectedAuditType.value, processKey);
+
+    if (selectedAuditType.value === 'rto') {
+      checklistSavedProcesses.value[processKey as RtoAuditProcessKey] = true;
+    } else {
+      boardSavedProcesses.value[processKey as Board5sAuditProcessKey] = true;
+    }
+
+    $q.notify({
+      type: 'positive',
+      message: `Processo ${processKey} salvo com sucesso.`,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Nao foi possivel salvar o processo.';
+    pageError.value = message;
+    $q.notify({
+      type: 'negative',
+      message,
+    });
+    throw err;
   }
 }
 

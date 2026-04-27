@@ -12,14 +12,19 @@
         </div>
       </section>
 
-      <q-banner
-        v-if="pageError || error"
-        rounded
-        class="q-mb-lg bg-negative text-white"
-        inline-actions
-      >
-        {{ pageError || error }}
-      </q-banner>
+      <section class="q-mb-lg">
+        <q-select
+          v-model="selectedTurma"
+          outlined
+          dense
+          emit-value
+          map-options
+          options-dense
+          :options="turmaOptions"
+          label="Turma responsável"
+          class="turma-select"
+        />
+      </section>
 
       <!-- Audit Tabs -->
       <q-tabs
@@ -43,10 +48,10 @@
           </template>
         </q-tab>
 
-        <q-tab name="board5s" label="Board 5S">
+        <q-tab name="board5s" label="Quadros (5S)">
           <template #default>
             <div class="tab-label-content">
-              <span>Board (5S)</span>
+              <span>Quadros (5S)</span>
               <q-chip
                 size="sm"
                 color="primary"
@@ -88,7 +93,7 @@
             : board5sProcessDefinitions"
           :key="process.key"
           class="col-12 col-md-6 col-xl-4"
-          :class="{ 'process-card-disabled': !auditStarted }"
+          :class="{ 'process-card-disabled': !selectedTurma || !auditStarted }"
         >
           <ProcessCard
             :process-key="process.key"
@@ -126,7 +131,7 @@
           color="positive"
           unelevated
           label="Finalizar Ambas as Auditorias"
-          :disable="!allComplete || !allProcessesValid || isBusy"
+          :disable="!selectedTurma || !allComplete || !allProcessesValid || isBusy"
           :loading="isFinishing"
           @click="finishAudits"
         />
@@ -180,11 +185,23 @@ const {
   checklistProcessFiles,
   boardProcessFiles,
   loading,
-  error,
+  turma,
   checklistCompletedCount,
   boardCompletedCount,
   allComplete,
 } = storeToRefs(auditStore);
+
+const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
+  { label: 'A e C', value: 'A e C' },
+  { label: 'B e D', value: 'B e D' },
+];
+
+const selectedTurma = computed<'A e C' | 'B e D' | null>({
+  get: () => turma.value,
+  set: (value) => {
+    void auditStore.setTurma(value);
+  },
+});
 
 const selectedAuditType = ref<AuditType>('rto');
 const isFinishing = ref(false);

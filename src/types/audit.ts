@@ -115,6 +115,7 @@ export type UpdatableProcessStatus = Exclude<AuditProcessStatus, null>;
 export interface DualTypeAuditDocument {
   auditSessionId: string;
   date: string; // YYYY-MM-DD
+  turma: 'A e C' | 'B e D';
   completedAt?: Timestamp;
   inspector: string; // userId
   createdAt: Timestamp;
@@ -128,6 +129,7 @@ export interface DualTypeAuditResultDocument {
   auditId: string; // date string (YYYY-MM-DD)
   auditSessionId: string;
   date: string; // YYYY-MM-DD
+  turma: 'A e C' | 'B e D';
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
   hasIssue: boolean; // status === 'not_updated'

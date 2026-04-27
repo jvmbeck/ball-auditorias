@@ -30,7 +30,7 @@
               outline
               color="primary"
               icon="refresh"
-              label="Refresh"
+              label="Atualizar"
               :loading="refreshingAnalytics"
               @click="handleRefreshAnalytics"
               class="q-mr-md"
@@ -53,13 +53,7 @@
         <!-- Responsive charts grid -->
         <div class="charts-grid">
           <div class="chart-item">
-            <ProcessFailureRateCard />
-          </div>
-          <div class="chart-item">
-            <FailuresByProcessCard />
-          </div>
-          <div class="chart-item">
-            <FailuresOverTimeCard />
+            <FailuresByProcessAndTurmaCard />
           </div>
         </div>
       </section>
@@ -72,9 +66,7 @@ import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import DailyAuditCard from 'src/components/DailyAuditCard.vue';
-import FailuresByProcessCard from 'src/components/FailuresByProcessCard.vue';
-import FailuresOverTimeCard from 'src/components/FailuresOverTimeCard.vue';
-import ProcessFailureRateCard from 'src/components/ProcessFailureRateCard.vue';
+import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();
@@ -84,11 +76,11 @@ const refreshingAnalytics = ref(false);
 const selectedDays = ref(30);
 
 const daysOptions = [
-  { label: 'Last 7 days', value: 7 },
-  { label: 'Last 14 days', value: 14 },
-  { label: 'Last 30 days', value: 30 },
-  { label: 'Last 60 days', value: 60 },
-  { label: 'Last 90 days', value: 90 },
+  { label: 'Últimos 7 dias', value: 7 },
+  { label: 'Últimos 14 dias', value: 14 },
+  { label: 'Últimos 30 dias', value: 30 },
+  { label: 'Últimos 60 dias', value: 60 },
+  { label: 'Últimos 90 dias', value: 90 },
 ];
 
 async function handleRefreshAnalytics() {
@@ -98,12 +90,12 @@ async function handleRefreshAnalytics() {
     await analyticsStore.refreshAllAnalytics();
     $q.notify({
       type: 'positive',
-      message: 'Analytics refreshed.',
+      message: 'Dados atualizados com sucesso.',
     });
   } catch {
     $q.notify({
       type: 'negative',
-      message: 'Unable to refresh analytics right now.',
+      message: 'Não foi possível atualizar os dados no momento.',
     });
   } finally {
     refreshingAnalytics.value = false;
@@ -182,7 +174,7 @@ async function handleRefreshAnalytics() {
 }
 
 .charts-grid {
-  display: grid;
+  display: flex;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 1.5rem;
   margin-top: 1.5rem;

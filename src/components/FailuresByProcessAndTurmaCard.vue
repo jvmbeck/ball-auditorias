@@ -3,7 +3,7 @@
     <q-card-section>
       <p class="eyebrow">Insight Prioritário</p>
       <h2 class="title">Falhas por Processo e Turma</h2>
-      <p class="subtitle">Últimos 30 dias · Turmas A/C vs B/D</p>
+      <p class="subtitle">{{ subtitle }}</p>
     </q-card-section>
 
     <q-separator />
@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide } from 'vue';
+import { computed, provide, watch } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -41,10 +41,15 @@ import { useAnalyticsStore } from 'src/stores/analytics.store';
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 provide(THEME_KEY, 'light');
 
+const props = defineProps<{
+  days: number;
+}>();
+
 const analyticsStore = useAnalyticsStore();
 const loading = computed(() => analyticsStore.byProcessAndTurmaLoading);
 const error = computed(() => analyticsStore.byProcessAndTurmaError);
 const chartState = computed(() => analyticsStore.failuresByProcessAndTurma);
+const subtitle = computed(() => `Ultimos ${props.days} dias · Turmas A/C vs B/D`);
 
 const chartOption = computed(() => ({
   tooltip: {
@@ -114,13 +119,17 @@ const chartOption = computed(() => ({
   ],
 }));
 
-onMounted(async () => {
-  try {
-    await analyticsStore.loadFailuresByProcessAndTurma();
-  } catch {
-    // Error state is handled in the store.
-  }
-});
+watch(
+  () => props.days,
+  async (days) => {
+    try {
+      await analyticsStore.loadFailuresByProcessAndTurma(undefined, false, days);
+    } catch {
+      // Error state is handled in the store.
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>

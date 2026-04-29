@@ -3,6 +3,7 @@ export * from './auditResults';
 export * from './analytics.failuresOverTime';
 export * from './analytics.failuresByProcess';
 export * from './analytics.failuresByProcessAndTurma';
+export * from './analytics.failuresByDateAndProcess';
 export * from './analytics.processFailureRate';
 export * from './createAuditService';
 export * from './checklistAuditService';

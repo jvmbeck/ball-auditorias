@@ -102,6 +102,16 @@ export interface FailuresByProcessAndTurmaData {
   seriesBD: number[];
 }
 
+export interface FailuresByDateAndProcessSeries {
+  name: string;
+  data: number[];
+}
+
+export interface FailuresByDateAndProcessData {
+  labels: string[];
+  series: FailuresByDateAndProcessSeries[];
+}
+
 /** Write-side shape for a single analytics record in a process-results collection. */
 export interface rtoAuditResultDocument {
   auditId: string;

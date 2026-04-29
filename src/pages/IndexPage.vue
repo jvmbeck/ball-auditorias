@@ -37,14 +37,15 @@
             />
 
             <q-select
+              v-model="selectedDays"
               outlined
               dense
-              :model-value="selectedDays"
               :options="daysOptions"
               option-value="value"
               option-label="label"
-              @update:model-value="(v) => (selectedDays = v)"
-              label="Select period"
+              emit-value
+              map-options
+              label="Selecione o período"
               class="days-select"
             />
           </div>
@@ -53,7 +54,10 @@
         <!-- Responsive charts grid -->
         <div class="charts-grid">
           <div class="chart-item">
-            <FailuresByProcessAndTurmaCard />
+            <FailuresByProcessAndTurmaCard :days="selectedDays" />
+          </div>
+          <div class="chart-item">
+            <FailuresByDateAndProcessCard :days="selectedDays" />
           </div>
         </div>
       </section>
@@ -66,6 +70,7 @@ import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import DailyAuditCard from 'src/components/DailyAuditCard.vue';
+import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
 import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
@@ -73,7 +78,7 @@ const $q = useQuasar();
 const analyticsStore = useAnalyticsStore();
 
 const refreshingAnalytics = ref(false);
-const selectedDays = ref(30);
+const selectedDays = ref<number>(30);
 
 const daysOptions = [
   { label: 'Últimos 7 dias', value: 7 },
@@ -87,7 +92,7 @@ async function handleRefreshAnalytics() {
   refreshingAnalytics.value = true;
 
   try {
-    await analyticsStore.refreshAllAnalytics();
+    await analyticsStore.refreshAllAnalytics(selectedDays.value);
     $q.notify({
       type: 'positive',
       message: 'Dados atualizados com sucesso.',
@@ -174,7 +179,7 @@ async function handleRefreshAnalytics() {
 }
 
 .charts-grid {
-  display: flex;
+  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 1.5rem;
   margin-top: 1.5rem;

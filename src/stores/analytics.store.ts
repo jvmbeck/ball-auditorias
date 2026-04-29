@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
+  fetchFailuresByDateAndProcess,
   fetchFailuresByProcess,
   fetchFailuresByProcessAndTurma,
   fetchFailuresOverTime,
   fetchProcessFailureRates,
 } from 'src/services/audit';
 import type {
+  FailuresByDateAndProcessData,
   FailuresByProcessAndTurmaData,
   FailuresByProcessData,
   FailuresOverTimeData,
@@ -42,6 +44,11 @@ const EMPTY_FAILURES_BY_PROCESS_AND_TURMA: FailuresByProcessAndTurmaData = {
   seriesBD: [],
 };
 
+const EMPTY_FAILURES_BY_DATE_AND_PROCESS: FailuresByDateAndProcessData = {
+  labels: [],
+  series: [],
+};
+
 function isStale(lastFetchedAt: number | null): boolean {
   if (!lastFetchedAt) {
     return true;
@@ -61,21 +68,29 @@ export const useAnalyticsStore = defineStore(
     const failuresByProcessAndTurma = ref<FailuresByProcessAndTurmaData>(
       EMPTY_FAILURES_BY_PROCESS_AND_TURMA,
     );
+    const failuresByDateAndProcess = ref<FailuresByDateAndProcessData>(
+      EMPTY_FAILURES_BY_DATE_AND_PROCESS,
+    );
 
     const overTimeLoading = ref(false);
     const byProcessLoading = ref(false);
     const processFailureRateLoading = ref(false);
     const byProcessAndTurmaLoading = ref(false);
+    const byDateAndProcessLoading = ref(false);
 
     const overTimeError = ref<string | null>(null);
     const byProcessError = ref<string | null>(null);
     const processFailureRateError = ref<string | null>(null);
     const byProcessAndTurmaError = ref<string | null>(null);
+    const byDateAndProcessError = ref<string | null>(null);
 
     const overTimeLastFetchedAt = ref<number | null>(null);
     const byProcessLastFetchedAt = ref<number | null>(null);
     const processFailureRateLastFetchedAt = ref<number | null>(null);
     const byProcessAndTurmaLastFetchedAt = ref<number | null>(null);
+    const byProcessAndTurmaDays = ref(30);
+    const byDateAndProcessLastFetchedAt = ref<number | null>(null);
+    const byDateAndProcessDays = ref(30);
 
     // ── Dual-type state ───────────────────────────────────────────────────────
 
@@ -102,6 +117,7 @@ export const useAnalyticsStore = defineStore(
     let byProcessRequest: Promise<void> | null = null;
     let processFailureRateRequest: Promise<void> | null = null;
     let byProcessAndTurmaRequest: Promise<void> | null = null;
+    let byDateAndProcessRequest: Promise<void> | null = null;
 
     let checklistOverTimeRequest: Promise<void> | null = null;
     let boardOverTimeRequest: Promise<void> | null = null;
@@ -334,10 +350,19 @@ export const useAnalyticsStore = defineStore(
       ]);
     }
 
-    async function loadFailuresByProcessAndTurma(type?: AuditType, force = false): Promise<void> {
+    async function loadFailuresByProcessAndTurma(
+      type?: AuditType,
+      force = false,
+      days = 30,
+    ): Promise<void> {
       const hasCachedData = failuresByProcessAndTurma.value.labels.length > 0;
 
-      if (!force && hasCachedData && !isStale(byProcessAndTurmaLastFetchedAt.value)) {
+      if (
+        !force &&
+        hasCachedData &&
+        byProcessAndTurmaDays.value === days &&
+        !isStale(byProcessAndTurmaLastFetchedAt.value)
+      ) {
         return;
       }
 
@@ -350,7 +375,8 @@ export const useAnalyticsStore = defineStore(
         byProcessAndTurmaError.value = null;
 
         try {
-          failuresByProcessAndTurma.value = await fetchFailuresByProcessAndTurma(type);
+          failuresByProcessAndTurma.value = await fetchFailuresByProcessAndTurma(type, days);
+          byProcessAndTurmaDays.value = days;
           byProcessAndTurmaLastFetchedAt.value = Date.now();
         } catch (err: unknown) {
           byProcessAndTurmaError.value =
@@ -365,12 +391,54 @@ export const useAnalyticsStore = defineStore(
       return byProcessAndTurmaRequest;
     }
 
-    async function refreshAllAnalytics(): Promise<void> {
+    async function loadFailuresByDateAndProcess(
+      type?: AuditType,
+      force = false,
+      days = 30,
+    ): Promise<void> {
+      const hasCachedData = failuresByDateAndProcess.value.labels.length > 0;
+
+      if (
+        !force &&
+        hasCachedData &&
+        byDateAndProcessDays.value === days &&
+        !isStale(byDateAndProcessLastFetchedAt.value)
+      ) {
+        return;
+      }
+
+      if (byDateAndProcessRequest) {
+        return byDateAndProcessRequest;
+      }
+
+      byDateAndProcessRequest = (async () => {
+        byDateAndProcessLoading.value = true;
+        byDateAndProcessError.value = null;
+
+        try {
+          failuresByDateAndProcess.value = await fetchFailuresByDateAndProcess(type, days);
+          byDateAndProcessDays.value = days;
+          byDateAndProcessLastFetchedAt.value = Date.now();
+        } catch (err: unknown) {
+          byDateAndProcessError.value =
+            err instanceof Error ? err.message : 'Unable to load failures by date and process.';
+          throw err;
+        } finally {
+          byDateAndProcessLoading.value = false;
+          byDateAndProcessRequest = null;
+        }
+      })();
+
+      return byDateAndProcessRequest;
+    }
+
+    async function refreshAllAnalytics(days = 30): Promise<void> {
       await Promise.all([
         loadFailuresOverTime(true),
         loadFailuresByProcess(true),
         loadProcessFailureRates(true),
-        loadFailuresByProcessAndTurma(undefined, true),
+        loadFailuresByProcessAndTurma(undefined, true, days),
+        loadFailuresByDateAndProcess(undefined, true, days),
       ]);
     }
 
@@ -380,22 +448,29 @@ export const useAnalyticsStore = defineStore(
       failuresByProcess,
       processFailureRates,
       failuresByProcessAndTurma,
+      failuresByDateAndProcess,
       overTimeLoading,
       byProcessLoading,
       processFailureRateLoading,
       byProcessAndTurmaLoading,
+      byDateAndProcessLoading,
       overTimeError,
       byProcessError,
       processFailureRateError,
       byProcessAndTurmaError,
+      byDateAndProcessError,
       overTimeLastFetchedAt,
       byProcessLastFetchedAt,
       processFailureRateLastFetchedAt,
       byProcessAndTurmaLastFetchedAt,
+      byProcessAndTurmaDays,
+      byDateAndProcessLastFetchedAt,
+      byDateAndProcessDays,
       loadFailuresOverTime,
       loadFailuresByProcess,
       loadProcessFailureRates,
       loadFailuresByProcessAndTurma,
+      loadFailuresByDateAndProcess,
       refreshAllAnalytics,
       // Dual-type
       checklistFailuresOverTime,
@@ -425,10 +500,14 @@ export const useAnalyticsStore = defineStore(
         'failuresByProcess',
         'processFailureRates',
         'failuresByProcessAndTurma',
+        'failuresByDateAndProcess',
         'overTimeLastFetchedAt',
         'byProcessLastFetchedAt',
         'processFailureRateLastFetchedAt',
         'byProcessAndTurmaLastFetchedAt',
+        'byProcessAndTurmaDays',
+        'byDateAndProcessLastFetchedAt',
+        'byDateAndProcessDays',
         // Dual-type
         'checklistFailuresOverTime',
         'boardFailuresOverTime',

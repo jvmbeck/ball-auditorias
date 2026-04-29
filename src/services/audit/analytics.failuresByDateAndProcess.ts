@@ -1,6 +1,6 @@
 import { db } from 'boot/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import type { FailuresByProcessAndTurmaData, AuditType } from 'src/types/audit';
+import type { AuditType, FailuresByDateAndProcessData } from 'src/types/audit';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 const PROCESS_LABELS: Record<string, string> = {
@@ -33,35 +33,35 @@ function normalizeProcessLabel(process: string): string {
 function getCollectionsToQuery(type?: AuditType): string[] {
   if (type === 'rto') return ['rtoProcessResults'];
   if (type === 'board5s') return ['board5sProcessResults'];
-  // No type → query both active collections
   return ['rtoProcessResults', 'board5sProcessResults'];
 }
 
 /**
- * Fetches failed audit results and groups them by process AND turma for the requested period.
- * Returns two parallel data series — one per turma — aligned to the same process labels.
- *
- * When no type is provided, queries both rtoProcessResults and board5sProcessResults.
- *
- * @param type Optional audit type ('rto' or 'board5s'). If omitted, queries all collections.
- * @param days Number of trailing days to include. Defaults to 30.
+ * Fetches issue records grouped by date and process for line-chart visualization.
+ * Returns one line series per process found in the selected period.
  */
-export async function fetchFailuresByProcessAndTurma(
+export async function fetchFailuresByDateAndProcess(
   type?: AuditType,
   days = 30,
-): Promise<FailuresByProcessAndTurmaData> {
+): Promise<FailuresByDateAndProcessData> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const safeDays = Math.max(days, 1);
   const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - Math.max(days - 1, 0));
-  const startDateKey = toDateKey(startDate);
+  startDate.setDate(startDate.getDate() - (safeDays - 1));
 
-  const countsByTurma: Record<'A e C' | 'B e D', Record<string, number>> = {
-    'A e C': {},
-    'B e D': {},
-  };
+  const labels: string[] = [];
+  for (let index = 0; index < safeDays; index += 1) {
+    const current = new Date(startDate);
+    current.setDate(startDate.getDate() + index);
+    labels.push(toDateKey(current));
+  }
 
+  const labelsSet = new Set(labels);
+  const startDateKey = labels[0] ?? toDateKey(startDate);
+
+  const countsByProcess: Record<string, Record<string, number>> = {};
   const collectionsToQuery = getCollectionsToQuery(type);
 
   await Promise.all(
@@ -74,7 +74,6 @@ export async function fetchFailuresByProcessAndTurma(
           process: unknown;
           processKey: unknown;
           date: unknown;
-          turma: unknown;
         }>;
 
         const processRaw =
@@ -84,34 +83,35 @@ export async function fetchFailuresByProcessAndTurma(
               ? data.processKey
               : null;
         const date = typeof data.date === 'string' ? data.date : null;
-        const turma = data.turma === 'A e C' || data.turma === 'B e D' ? data.turma : null;
 
-        if (!processRaw || !date || !turma || date < startDateKey) {
+        if (!processRaw || !date || date < startDateKey || !labelsSet.has(date)) {
           return;
         }
 
         const processLabel = normalizeProcessLabel(processRaw);
-        countsByTurma[turma][processLabel] = (countsByTurma[turma][processLabel] ?? 0) + 1;
+
+        if (!countsByProcess[processLabel]) {
+          countsByProcess[processLabel] = Object.fromEntries(labels.map((label) => [label, 0]));
+        }
+
+        countsByProcess[processLabel][date] = (countsByProcess[processLabel][date] ?? 0) + 1;
       });
     }),
   );
 
-  // Collect all process labels and sort by total failures descending
-  const allProcesses = new Set([
-    ...Object.keys(countsByTurma['A e C']),
-    ...Object.keys(countsByTurma['B e D']),
-  ]);
-
-  const orderedEntries = [...allProcesses]
-    .map((label) => ({
-      label,
-      total: (countsByTurma['A e C'][label] ?? 0) + (countsByTurma['B e D'][label] ?? 0),
+  const orderedProcesses = Object.entries(countsByProcess)
+    .map(([name, counts]) => ({
+      name,
+      counts,
+      total: Object.values(counts).reduce((sum, value) => sum + value, 0),
     }))
     .sort((a, b) => b.total - a.total);
 
-  const labels = orderedEntries.map((e) => e.label);
-  const seriesAC = labels.map((l) => countsByTurma['A e C'][l] ?? 0);
-  const seriesBD = labels.map((l) => countsByTurma['B e D'][l] ?? 0);
-
-  return { labels, seriesAC, seriesBD };
+  return {
+    labels,
+    series: orderedProcesses.map((processEntry) => ({
+      name: processEntry.name,
+      data: labels.map((label) => processEntry.counts[label] ?? 0),
+    })),
+  };
 }

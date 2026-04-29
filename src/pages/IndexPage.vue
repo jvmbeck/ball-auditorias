@@ -30,21 +30,22 @@
               outline
               color="primary"
               icon="refresh"
-              label="Refresh"
+              label="Atualizar"
               :loading="refreshingAnalytics"
               @click="handleRefreshAnalytics"
               class="q-mr-md"
             />
 
             <q-select
+              v-model="selectedDays"
               outlined
               dense
-              :model-value="selectedDays"
               :options="daysOptions"
               option-value="value"
               option-label="label"
-              @update:model-value="(v) => (selectedDays = v)"
-              label="Select period"
+              emit-value
+              map-options
+              label="Selecione o período"
               class="days-select"
             />
           </div>
@@ -53,13 +54,10 @@
         <!-- Responsive charts grid -->
         <div class="charts-grid">
           <div class="chart-item">
-            <ProcessFailureRateCard />
+            <FailuresByProcessAndTurmaCard :days="selectedDays" />
           </div>
           <div class="chart-item">
-            <FailuresByProcessCard />
-          </div>
-          <div class="chart-item">
-            <FailuresOverTimeCard />
+            <FailuresByDateAndProcessCard :days="selectedDays" />
           </div>
         </div>
       </section>
@@ -72,38 +70,37 @@ import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import DailyAuditCard from 'src/components/DailyAuditCard.vue';
-import FailuresByProcessCard from 'src/components/FailuresByProcessCard.vue';
-import FailuresOverTimeCard from 'src/components/FailuresOverTimeCard.vue';
-import ProcessFailureRateCard from 'src/components/ProcessFailureRateCard.vue';
+import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
+import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();
 const analyticsStore = useAnalyticsStore();
 
 const refreshingAnalytics = ref(false);
-const selectedDays = ref(30);
+const selectedDays = ref<number>(30);
 
 const daysOptions = [
-  { label: 'Last 7 days', value: 7 },
-  { label: 'Last 14 days', value: 14 },
-  { label: 'Last 30 days', value: 30 },
-  { label: 'Last 60 days', value: 60 },
-  { label: 'Last 90 days', value: 90 },
+  { label: 'Últimos 7 dias', value: 7 },
+  { label: 'Últimos 14 dias', value: 14 },
+  { label: 'Últimos 30 dias', value: 30 },
+  { label: 'Últimos 60 dias', value: 60 },
+  { label: 'Últimos 90 dias', value: 90 },
 ];
 
 async function handleRefreshAnalytics() {
   refreshingAnalytics.value = true;
 
   try {
-    await analyticsStore.refreshAllAnalytics();
+    await analyticsStore.refreshAllAnalytics(selectedDays.value);
     $q.notify({
       type: 'positive',
-      message: 'Analytics refreshed.',
+      message: 'Dados atualizados com sucesso.',
     });
   } catch {
     $q.notify({
       type: 'negative',
-      message: 'Unable to refresh analytics right now.',
+      message: 'Não foi possível atualizar os dados no momento.',
     });
   } finally {
     refreshingAnalytics.value = false;

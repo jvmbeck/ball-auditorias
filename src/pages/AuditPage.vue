@@ -390,6 +390,13 @@ async function finishAudits() {
 onMounted(async () => {
   const draft = auditStore.checkTodaysDraft();
 
+  if (auditStore.consumeDayRolloverNotice()) {
+    $q.notify({
+      type: 'info',
+      message: 'Auditoria do dia anterior mantida no historico. Nova auditoria iniciada para hoje.',
+    });
+  }
+
   if (!draft && selectedTurma.value && !auditStarted.value) {
     await startAudits();
   }

@@ -155,6 +155,45 @@ export const useAuditStore = defineStore(
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    function clearActiveDraftState(preserveTurma = true): void {
+      auditId.value = null;
+      error.value = null;
+
+      if (!preserveTurma) {
+        turma.value = null;
+      }
+
+      PROCESS_KEYS.forEach((key) => {
+        processState[key] = { status: null, comment: '' };
+        processFiles[key] = null;
+      });
+    }
+
+    function discardStaleDraftIfNeeded(): void {
+      const today = getTodayKey();
+      const auditorId = authStore.firebaseUser?.uid ?? null;
+
+      const isDifferentAuditor = Boolean(
+        draftAuditorId.value && draftAuditorId.value !== auditorId,
+      );
+      const isDifferentDay = Boolean(draftDate.value && draftDate.value !== today);
+      const hasStaleDateKeyAuditId = Boolean(
+        auditId.value && /^\d{4}-\d{2}-\d{2}$/.test(auditId.value) && auditId.value !== today,
+      );
+
+      if (!isDifferentAuditor && !isDifferentDay && !hasStaleDateKeyAuditId) {
+        return;
+      }
+
+      clearActiveDraftState(!isDifferentAuditor);
+
+      draftDate.value = null;
+      draftAuditorId.value = auditorId;
+      draftCompleted.value = false;
+      draftCompletedAuditId.value = null;
+      draftCompletedTurma.value = null;
+    }
+
     function resetState() {
       // Capture current values before nulling them so the dashboard can still
       // reference the just-completed audit via checkTodaysDraft().
@@ -212,6 +251,8 @@ export const useAuditStore = defineStore(
 
       loading.value = true;
       error.value = null;
+
+      discardStaleDraftIfNeeded();
 
       try {
         const existingAuditId = await getTodaysInProgressAuditId(auditorId);
@@ -334,6 +375,8 @@ export const useAuditStore = defineStore(
       completedCount: number;
       completed: boolean;
     } | null {
+      discardStaleDraftIfNeeded();
+
       const auditorId = authStore.firebaseUser?.uid;
 
       if (!auditorId || draftAuditorId.value !== auditorId || draftDate.value !== getTodayKey()) {

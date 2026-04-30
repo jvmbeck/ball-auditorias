@@ -79,7 +79,7 @@
 
           <template v-else>
             <q-item
-              v-for="audit in filteredAuditHistory"
+              v-for="audit in paginatedAuditHistory"
               :key="audit.id"
               class="history-item history-item-clickable"
               clickable
@@ -121,6 +121,30 @@
         </q-list>
       </q-card>
 
+      <section v-if="filteredAuditHistory.length > 0" class="pagination-section q-mt-md">
+        <div class="pagination-meta">{{ paginationSummary }}</div>
+        <q-select
+          v-model="pageSize"
+          outlined
+          dense
+          emit-value
+          map-options
+          :options="pageSizeOptions"
+          option-label="label"
+          option-value="value"
+          label="Itens por página"
+          class="page-size-select"
+        />
+        <q-pagination
+          v-model="currentPage"
+          :max="totalPages"
+          :max-pages="6"
+          color="primary"
+          direction-links
+          boundary-links
+        />
+      </section>
+
       <AuditDetailsDialog
         v-model="isDetailsDialogOpen"
         :audit="selectedAudit"
@@ -135,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import AuditDetailsDialog from 'src/components/AuditDetailsDialog.vue';
 import { useHistoryStore } from 'src/stores/history.store';
 import { formatAuditDate, formatDayOfWeek } from 'src/utils/dateFormatting';
@@ -144,6 +168,7 @@ import type { AuditType, DualAuditProcessKey, DualTypeAuditResultDocument } from
 type AuditTypeFilter = 'all' | AuditType;
 type StatusFilter = 'all' | 'with_issues' | 'without_issues';
 type TurmaFilter = 'all' | 'A e C' | 'B e D';
+type PageSize = 20 | 50 | 100;
 
 type HistoryAuditItem = {
   id: string;
@@ -188,6 +213,14 @@ const historyStore = useHistoryStore();
 const selectedAuditType = ref<AuditTypeFilter>('all');
 const selectedStatusFilter = ref<StatusFilter>('all');
 const selectedTurmaFilter = ref<TurmaFilter>('all');
+const currentPage = ref(1);
+const pageSize = ref<PageSize>(20);
+
+const pageSizeOptions: Array<{ label: string; value: PageSize }> = [
+  { label: '20', value: 20 },
+  { label: '50', value: 50 },
+  { label: '100', value: 100 },
+];
 
 const auditTypeFilterOptions = computed<Array<{ label: string; value: AuditTypeFilter }>>(() => {
   const typeOptions = (Object.entries(TYPE_LABELS) as Array<[AuditType, string]>).map(
@@ -235,6 +268,29 @@ const filteredAuditHistory = computed<HistoryAuditItem[]>(() => {
   });
 });
 
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredAuditHistory.value.length / pageSize.value)),
+);
+
+const paginatedAuditHistory = computed<HistoryAuditItem[]>(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return filteredAuditHistory.value.slice(start, end);
+});
+
+const paginationSummary = computed(() => {
+  const total = filteredAuditHistory.value.length;
+
+  if (total === 0) {
+    return '0 resultados';
+  }
+
+  const start = (currentPage.value - 1) * pageSize.value + 1;
+  const end = Math.min(start + pageSize.value - 1, total);
+
+  return `${start}-${end} de ${total}`;
+});
+
 const historyLoading = computed(() => Object.values(historyStore.loadingByType).some(Boolean));
 
 const historyError = computed(() => {
@@ -264,6 +320,16 @@ function openAuditDetails(audit: HistoryAuditItem) {
 
 onMounted(() => {
   void historyStore.loadAllHistory();
+});
+
+watch([selectedAuditType, selectedStatusFilter, selectedTurmaFilter, pageSize], () => {
+  currentPage.value = 1;
+});
+
+watch(totalPages, (nextTotalPages) => {
+  if (currentPage.value > nextTotalPages) {
+    currentPage.value = nextTotalPages;
+  }
 });
 </script>
 
@@ -345,6 +411,24 @@ onMounted(() => {
   width: 100%;
 }
 
+.pagination-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-meta {
+  color: #5f7077;
+  font-size: 0.9rem;
+}
+
+.page-size-select {
+  min-width: 160px;
+  max-width: 180px;
+}
+
 @media (max-width: 640px) {
   .filters {
     justify-content: stretch;
@@ -352,6 +436,10 @@ onMounted(() => {
 
   .filter-select {
     max-width: none;
+  }
+
+  .pagination-section {
+    justify-content: center;
   }
 }
 </style>

@@ -3,9 +3,9 @@
     <q-card class="details-dialog">
       <q-card-section class="row items-center q-pb-none">
         <div>
-          <div class="text-overline">Audit Details</div>
+          <div class="text-overline">Detalhes da Auditoria</div>
           <div class="text-h6">
-            {{ audit ? formatAuditDate(audit.createdAt) : '' }}
+            {{ audit ? formatAuditDate(audit.completedAt) : '' }}
           </div>
           <div class="text-caption metadata">
             Turma {{ audit?.turma ?? '-' }} • {{ formatDayOfWeek(audit?.dayOfWeek || '') }} •
@@ -17,7 +17,7 @@
           outline
           color="primary"
           icon="content_copy"
-          label="Copy Summary"
+          label="Copiar Resumo"
           class="q-mr-sm"
           :disable="!audit"
           @click="copyAuditSummary"
@@ -31,7 +31,7 @@
             <q-item-section>
               <q-item-label class="process-title">{{ process.label }}</q-item-label>
               <q-item-label caption>
-                {{ getProcessExplanation(audit?.processes[process.key]?.comment) }}
+                {{ getProcessExplanation(getProcessResult(process.key)?.comment) }}
               </q-item-label>
             </q-item-section>
 
@@ -39,21 +39,24 @@
               <q-chip
                 dense
                 text-color="white"
-                :color="getProcessChipColor(audit?.processes[process.key]?.status)"
+                :color="getProcessChipColor(getProcessResult(process.key)?.status)"
                 class="q-mb-sm"
               >
-                {{ getProcessStatusLabel(audit?.processes[process.key]?.status) }}
+                {{ getProcessStatusLabel(getProcessResult(process.key)?.status) }}
               </q-chip>
 
               <q-btn
-                v-if="audit?.processes[process.key]?.imageUrl"
+                v-if="getProcessResult(process.key)?.imageUrl"
                 dense
                 outline
                 icon="download"
-                label="Download Image"
+                label="Baixar Imagem"
                 :loading="downloadingKey === process.key"
                 @click="
-                  downloadProcessImage(process.key, audit.processes[process.key].imageUrl as string)
+                  downloadProcessImage(
+                    process.key,
+                    getProcessResult(process.key)!.imageUrl as string,
+                  )
                 "
               />
             </q-item-section>
@@ -68,16 +71,35 @@
 import { computed, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { formatAuditDate, formatDayOfWeek } from 'src/utils/dateFormatting';
-import type { AuditHistoryItem, AuditProcessKey, AuditProcessStatus } from 'src/types/audit';
+import type {
+  AuditType,
+  AuditProcessStatus,
+  DualAuditProcessKey,
+  DualTypeAuditResultDocument,
+} from 'src/types/audit';
+
+type HistoryAuditItem = {
+  id: string;
+  type: AuditType;
+  turma: 'A e C' | 'B e D' | null;
+  date: string;
+  dayOfWeek: string;
+  yearMonth: string;
+  completedAt: Date | null;
+  failedProcesses: number;
+  totalProcesses: number;
+  hasFailures: boolean;
+  processes: Partial<Record<DualAuditProcessKey, DualTypeAuditResultDocument>>;
+};
 
 interface ProcessDefinition {
-  key: AuditProcessKey;
+  key: string;
   label: string;
 }
 
 const props = defineProps<{
   modelValue: boolean;
-  audit: AuditHistoryItem | null;
+  audit: HistoryAuditItem | null;
   processDefinitions: ProcessDefinition[];
 }>();
 
@@ -86,7 +108,11 @@ const emit = defineEmits<{
 }>();
 
 const $q = useQuasar();
-const downloadingKey = ref<AuditProcessKey | null>(null);
+const downloadingKey = ref<string | null>(null);
+
+function getProcessResult(key: string): DualTypeAuditResultDocument | undefined {
+  return props.audit?.processes[key as DualAuditProcessKey];
+}
 
 const isOpen = computed({
   get: () => props.modelValue,
@@ -99,14 +125,14 @@ function close() {
 
 function getProcessStatusLabel(status: AuditProcessStatus | undefined): string {
   if (status === 'updated') {
-    return 'Updated';
+    return 'Atualizado';
   }
 
   if (status === 'not_updated') {
-    return 'Issue Found';
+    return 'Problema Encontrado';
   }
 
-  return 'Not Recorded';
+  return 'Não Registrado';
 }
 
 function getProcessChipColor(status: AuditProcessStatus | undefined): string {
@@ -123,15 +149,15 @@ function getProcessChipColor(status: AuditProcessStatus | undefined): string {
 
 function getProcessExplanation(comment: string | null | undefined): string {
   const trimmed = comment?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : 'No issue explanation provided.';
+  return trimmed && trimmed.length > 0 ? trimmed : 'Nenhuma explicação fornecida.';
 }
 
-function getClipboardLine(processKey: AuditProcessKey, label: string): string {
-  const process = props.audit?.processes[processKey];
+function getClipboardLine(processKey: string, label: string): string {
+  const process = getProcessResult(processKey);
   const turmaSuffix = props.audit?.turma ? ` turma ${props.audit.turma}` : '';
 
   if (!process || process.status === null) {
-    return `- ${label} - ⚪ Nao registrado${turmaSuffix}`;
+    return `- ${label} - ⚪ Não registrado${turmaSuffix}`;
   }
 
   const isUpdated = process.status === 'updated';
@@ -184,7 +210,7 @@ async function copyAuditSummary() {
   }
 }
 
-async function downloadProcessImage(processKey: AuditProcessKey, imageUrl: string) {
+async function downloadProcessImage(processKey: string, imageUrl: string) {
   downloadingKey.value = processKey;
 
   try {

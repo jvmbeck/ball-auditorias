@@ -225,6 +225,7 @@ export const useDualAuditStore = defineStore(
     const draftCompleted = ref(false);
     const draftCompletedChecklistId = ref<string | null>(null);
     const draftCompletedBoardId = ref<string | null>(null);
+    const dayRolloverNotice = ref(false);
 
     // ── Computed (per type) ───────────────────────────────────────────────
 
@@ -256,6 +257,67 @@ export const useDualAuditStore = defineStore(
     const allComplete = computed<boolean>(() => checklistComplete.value && boardComplete.value);
 
     // ── Helper functions ─────────────────────────────────────────────────
+
+    function clearActiveDraftState(preserveTurma = true): void {
+      checklistAuditId.value = null;
+      boardAuditId.value = null;
+      error.value = null;
+
+      if (!preserveTurma) {
+        turma.value = null;
+      }
+
+      RTO_PROCESS_KEYS.forEach((key) => {
+        checklistProcessState[key] = { status: null, comment: '' };
+        checklistProcessFiles[key] = null;
+      });
+
+      PRINTER_CHECK_KEYS.forEach((printerKey) => {
+        checklistPrinterState[printerKey] = { status: null, comment: '' };
+        checklistPrinterFiles[printerKey] = null;
+      });
+
+      BOARD5S_PROCESS_KEYS.forEach((key) => {
+        boardProcessState[key] = { status: null, comment: '' };
+        boardProcessFiles[key] = null;
+      });
+    }
+
+    function discardStaleDraftIfNeeded(): void {
+      const today = getTodayKey();
+      const auditorId = authStore.firebaseUser?.uid ?? null;
+
+      const isDifferentAuditor = Boolean(
+        draftAuditorId.value && draftAuditorId.value !== auditorId,
+      );
+      const isDifferentDay = Boolean(draftDate.value && draftDate.value !== today);
+      const hasStaleChecklistId = Boolean(
+        checklistAuditId.value && checklistAuditId.value !== today,
+      );
+      const hasStaleBoardId = Boolean(boardAuditId.value && boardAuditId.value !== today);
+      const hasStaleActiveIds = hasStaleChecklistId || hasStaleBoardId;
+
+      if (!isDifferentAuditor && !isDifferentDay && !hasStaleActiveIds) {
+        return;
+      }
+
+      clearActiveDraftState(!isDifferentAuditor);
+
+      // Inform the UI that a previous day's draft was intentionally discarded.
+      dayRolloverNotice.value = isDifferentDay || hasStaleActiveIds;
+
+      draftDate.value = null;
+      draftAuditorId.value = auditorId;
+      draftCompleted.value = false;
+      draftCompletedChecklistId.value = null;
+      draftCompletedBoardId.value = null;
+    }
+
+    function consumeDayRolloverNotice(): boolean {
+      const shouldShow = dayRolloverNotice.value;
+      dayRolloverNotice.value = false;
+      return shouldShow;
+    }
 
     function resetState() {
       draftCompletedChecklistId.value = checklistAuditId.value;
@@ -406,6 +468,8 @@ export const useDualAuditStore = defineStore(
         throw new Error('Cannot start audits: select turma before starting.');
       }
 
+      discardStaleDraftIfNeeded();
+
       loading.value = true;
       error.value = null;
 
@@ -530,6 +594,8 @@ export const useDualAuditStore = defineStore(
       boardCompletedCount: number;
       completed: boolean;
     } | null {
+      discardStaleDraftIfNeeded();
+
       const auditorId = authStore.firebaseUser?.uid;
 
       if (!auditorId || draftAuditorId.value !== auditorId || draftDate.value !== getTodayKey()) {
@@ -586,6 +652,7 @@ export const useDualAuditStore = defineStore(
       saveProcess,
       finishAudits,
       checkTodaysDraft,
+      consumeDayRolloverNotice,
     };
   },
   {

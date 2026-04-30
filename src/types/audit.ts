@@ -175,3 +175,22 @@ export interface AuditServiceConfig {
   auditCollection: string;
   resultsCollection: string;
 }
+
+/**
+ * A completed audit session as shown in the history page.
+ * Type-aware: covers both rto and board5s (and future types).
+ * Processes are keyed by process key and hold the raw result document.
+ */
+export interface DualTypeHistoryItem {
+  id: string; // YYYY-MM-DD (the auditId / document ID)
+  type: AuditType;
+  turma: 'A e C' | 'B e D' | null;
+  date: string; // YYYY-MM-DD
+  dayOfWeek: string;
+  yearMonth: string;
+  completedAt: Date | null;
+  failedProcesses: number;
+  totalProcesses: number;
+  hasFailures: boolean;
+  processes: Partial<Record<DualAuditProcessKey, DualTypeAuditResultDocument>>;
+}

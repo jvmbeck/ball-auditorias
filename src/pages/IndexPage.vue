@@ -7,60 +7,92 @@
         <h1 class="hero-title">Auditorias</h1>
       </section>
 
-      <!-- Audit cards -->
-      <section class="audit-cards-grid q-mb-xl">
-        <DailyAuditCard />
-        <Checklist5SCard />
-      </section>
+      <!-- Audit tabs -->
+      <q-tabs
+        v-model="activeTab"
+        dense
+        class="text-primary q-mb-lg"
+        active-color="primary"
+        indicator-color="primary"
+      >
+        <q-tab name="dailyAudit" label="Auditoria Diária" />
+        <q-tab name="checklist5s" label="Checklist 5S" />
+      </q-tabs>
 
-      <!-- Analytics section -->
-      <section class="analytics-section">
-        <div class="analytics-header q-mb-md">
-          <div>
-            <p class="eyebrow">Análises</p>
-            <h2 class="section-title">Insights de Performance</h2>
-            <p class="subtitle">
-              Identifique quais processos estão apresentando mais falhas e priorize ações de
-              melhoria.
-            </p>
+      <!-- Auditoria Diária tab -->
+      <div v-show="activeTab === 'dailyAudit'">
+        <section class="q-mb-xl">
+          <DailyAuditCard />
+        </section>
+
+        <section class="analytics-section">
+          <div class="analytics-header q-mb-md">
+            <div>
+              <p class="eyebrow">Análises</p>
+              <h2 class="section-title">Insights de Performance</h2>
+              <p class="subtitle">
+                Identifique quais processos estão apresentando mais falhas e priorize ações de
+                melhoria.
+              </p>
+            </div>
+
+            <div class="analytics-controls">
+              <q-btn
+                outline
+                color="primary"
+                icon="refresh"
+                label="Atualizar"
+                :loading="refreshingAnalytics"
+                @click="handleRefreshAnalytics"
+                class="q-mr-md"
+              />
+
+              <q-select
+                v-model="selectedDays"
+                outlined
+                dense
+                :options="daysOptions"
+                option-value="value"
+                option-label="label"
+                emit-value
+                map-options
+                label="Selecione o período"
+                class="days-select"
+              />
+            </div>
           </div>
 
-          <div class="analytics-controls">
-            <q-btn
-              outline
-              color="primary"
-              icon="refresh"
-              label="Atualizar"
-              :loading="refreshingAnalytics"
-              @click="handleRefreshAnalytics"
-              class="q-mr-md"
-            />
+          <!-- Responsive charts grid -->
+          <div class="charts-grid">
+            <div class="chart-item">
+              <FailuresByProcessAndTurmaCard :days="selectedDays" />
+            </div>
+            <div class="chart-item">
+              <FailuresByDateAndProcessCard :days="selectedDays" />
+            </div>
+          </div>
+        </section>
+      </div>
 
-            <q-select
-              v-model="selectedDays"
-              outlined
-              dense
-              :options="daysOptions"
-              option-value="value"
-              option-label="label"
-              emit-value
-              map-options
-              label="Selecione o período"
-              class="days-select"
-            />
-          </div>
-        </div>
+      <!-- Checklist 5S tab -->
+      <div v-show="activeTab === 'checklist5s'">
+        <section class="q-mb-xl">
+          <Checklist5SCard />
+        </section>
 
-        <!-- Responsive charts grid -->
-        <div class="charts-grid">
-          <div class="chart-item">
-            <FailuresByProcessAndTurmaCard :days="selectedDays" />
+        <!-- Placeholder: 5S-specific analytics will be added in a later phase -->
+        <section class="analytics-section">
+          <div class="analytics-header q-mb-md">
+            <div>
+              <p class="eyebrow">Análises</p>
+              <h2 class="section-title">Insights 5S</h2>
+              <p class="subtitle">
+                Análises específicas do Checklist 5S serão exibidas aqui em uma próxima fase.
+              </p>
+            </div>
           </div>
-          <div class="chart-item">
-            <FailuresByDateAndProcessCard :days="selectedDays" />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   </q-page>
 </template>
@@ -77,6 +109,7 @@ import { useAnalyticsStore } from 'src/stores/analytics.store';
 const $q = useQuasar();
 const analyticsStore = useAnalyticsStore();
 
+const activeTab = ref<'dailyAudit' | 'checklist5s'>('dailyAudit');
 const refreshingAnalytics = ref(false);
 const selectedDays = ref<number>(30);
 
@@ -146,12 +179,6 @@ async function handleRefreshAnalytics() {
   margin-top: 2rem;
 }
 
-.audit-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.5rem;
-}
-
 .analytics-header {
   display: flex;
   align-items: flex-end;
@@ -199,10 +226,6 @@ async function handleRefreshAnalytics() {
 
   .analytics-controls {
     flex-direction: column;
-  }
-
-  .audit-cards-grid {
-    grid-template-columns: 1fr;
   }
 
   .days-select {

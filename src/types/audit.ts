@@ -2,7 +2,9 @@ import type { FieldValue, Timestamp } from 'firebase/firestore';
 
 export type AuditStatus = 'in_progress' | 'completed';
 
-export type AuditType = 'rto' | 'board5s';
+export type AuditType = 'rto' | 'board5s' | 'daily5s';
+
+export type Daily5sRatingValue = 1 | 3 | 5;
 
 export type PrinterCheckKey = 'printer1' | 'printer2' | 'printer3';
 
@@ -23,7 +25,19 @@ export type Board5sAuditProcessKey =
   | 'printer1'
   | 'printer2e3';
 
-export type DualAuditProcessKey = RtoAuditProcessKey | Board5sAuditProcessKey;
+export type Daily5sAuditProcessKey =
+  | 'minsters'
+  | 'bodyMakers11to14'
+  | 'bodyMakers15to18'
+  | 'bodyMakers19to23'
+  | 'bodyMakers24to31'
+  | 'printer1'
+  | 'printer2e3';
+
+export type DualAuditProcessKey =
+  | RtoAuditProcessKey
+  | Board5sAuditProcessKey
+  | Daily5sAuditProcessKey;
 
 // Legacy single-audit key type (RTO-only)
 export type AuditProcessKey = RtoAuditProcessKey;
@@ -161,6 +175,7 @@ export interface DualTypeAuditResultDocument {
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
   hasIssue: boolean; // status === 'not_updated'
+  rating?: Daily5sRatingValue | null;
   comment?: string | null;
   imageUrl?: string | null;
   printerChecks?: PrinterChecks | null;

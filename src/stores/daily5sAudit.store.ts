@@ -32,6 +32,14 @@ function getTodayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+function createDaily5sAuditId(dayId: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${dayId}_${crypto.randomUUID()}`;
+  }
+
+  return `${dayId}_${Date.now()}`;
+}
+
 function buildInitialProcessState(): Daily5sProcessState {
   return DAILY5S_KEYS.reduce((acc, key) => {
     acc[key] = { rating: null, comment: '' };
@@ -132,7 +140,7 @@ export const useDaily5sAuditStore = defineStore(
         draftAuditorId.value && draftAuditorId.value !== auditorId,
       );
       const isDifferentDay = Boolean(draftDate.value && draftDate.value !== today);
-      const hasStaleAuditId = Boolean(auditId.value && auditId.value !== today);
+      const hasStaleAuditId = Boolean(auditId.value && !auditId.value.startsWith(today));
 
       if (!isDifferentAuditor && !isDifferentDay && !hasStaleAuditId) {
         return;
@@ -216,8 +224,9 @@ export const useDaily5sAuditStore = defineStore(
       }
 
       if (todaysStatus.completed) {
-        auditId.value = null;
-        await hydrateSavedProcesses(todaysStatus.auditId);
+        clearActiveDraftState();
+        draftCompleted.value = false;
+        draftCompletedAuditId.value = null;
         return;
       }
 
@@ -241,7 +250,13 @@ export const useDaily5sAuditStore = defineStore(
       }
 
       const today = getTodayKey();
-      const createdAuditId = await daily5sAuditService.createAudit(today, today, turma.value, auditorId);
+      const createdAuditId = await daily5sAuditService.createAudit(
+        createDaily5sAuditId(today),
+        today,
+        turma.value,
+        auditorId,
+        today,
+      );
 
       auditId.value = createdAuditId;
       draftDate.value = today;
@@ -326,8 +341,8 @@ export const useDaily5sAuditStore = defineStore(
         await daily5sAuditService.completeAudit(auditId.value as string);
 
         draftCompletedAuditId.value = auditId.value;
-        draftCompleted.value = true;
-        auditId.value = null;
+        draftCompleted.value = false;
+        clearActiveDraftState();
       } catch (err: unknown) {
         error.value = err instanceof Error ? err.message : String(err);
         throw err;

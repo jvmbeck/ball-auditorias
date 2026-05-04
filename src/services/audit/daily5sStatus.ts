@@ -1,5 +1,5 @@
 import { db } from 'boot/firebase';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
 import { toDateKey } from 'src/utils/dateFormatting';
 import type {
   Daily5sAuditProcessKey,
@@ -11,6 +11,16 @@ import { isDaily5sProcessKey } from './daily5sDefinitions';
 
 function getTodayDateString(): string {
   return toDateKey(new Date());
+}
+
+function chunkArray<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < array.length; index += size) {
+    chunks.push(array.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function normalizeRating(
@@ -40,44 +50,85 @@ export interface Daily5sPersistedResult {
 export async function getTodaysDaily5sStatus(
   inspectorId: string,
 ): Promise<Daily5sTodayStatus | null> {
-  const auditId = getTodayDateString();
-  const auditRef = doc(db, 'daily5sAudits', auditId);
-  const auditSnapshot = await getDoc(auditRef);
+  const dayId = getTodayDateString();
+  const auditsQuery = query(
+    collection(db, 'daily5sAudits'),
+    where('inspector', '==', inspectorId),
+    where('auditSessionId', '==', dayId),
+  );
+  const auditsSnapshot = await getDocs(auditsQuery);
 
-  if (!auditSnapshot.exists()) {
+  if (auditsSnapshot.empty) {
     return null;
   }
 
-  const auditData = auditSnapshot.data() as DualTypeAuditDocument;
+  const audits = auditsSnapshot.docs.map((snapshot) => {
+    const data = snapshot.data() as DualTypeAuditDocument;
+    const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().getTime() : 0;
+    const completedAt =
+      data.completedAt instanceof Timestamp ? data.completedAt.toDate().getTime() : null;
 
-  if (auditData.inspector !== inspectorId) {
+    return {
+      id: snapshot.id,
+      data,
+      createdAt,
+      completedAt,
+    };
+  });
+
+  const inProgressAudit = audits
+    .filter(({ completedAt }) => completedAt == null)
+    .sort((left, right) => right.createdAt - left.createdAt)[0];
+
+  const latestCompletedAudit = audits
+    .filter(({ completedAt }) => completedAt != null)
+    .sort((left, right) => (right.completedAt ?? 0) - (left.completedAt ?? 0))[0];
+
+  const activeAudit = inProgressAudit ?? latestCompletedAudit;
+
+  if (!activeAudit) {
     return null;
   }
 
-  const resultsQuery = query(collection(db, 'daily5sProcessResults'), where('auditId', '==', auditId));
-  const resultSnapshots = await getDocs(resultsQuery);
-
+  const auditId = activeAudit.id;
+  const auditData = activeAudit.data;
   const processKeys = new Set<Daily5sAuditProcessKey>();
 
-  resultSnapshots.forEach((snapshot) => {
-    const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
-    if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
-      return;
-    }
+  for (const auditIdChunk of chunkArray(
+    audits.map(({ id }) => id),
+    30,
+  )) {
+    const resultsQuery = query(
+      collection(db, 'daily5sProcessResults'),
+      where('auditId', 'in', auditIdChunk),
+    );
+    const resultSnapshots = await getDocs(resultsQuery);
 
-    processKeys.add(data.process);
-  });
+    resultSnapshots.forEach((snapshot) => {
+      const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
+      if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
+        return;
+      }
+
+      processKeys.add(data.process);
+    });
+  }
 
   return {
     auditId,
     turma: auditData.turma ?? null,
-    completed: Boolean(auditData.completedAt),
+    completed: activeAudit.completedAt != null,
     ratedProcessKeys: [...processKeys],
   };
 }
 
-export async function getDaily5sResultsForAudit(auditId: string): Promise<Daily5sPersistedResult[]> {
-  const resultsQuery = query(collection(db, 'daily5sProcessResults'), where('auditId', '==', auditId));
+export async function getDaily5sResultsForAudit(
+  auditId: string,
+): Promise<Daily5sPersistedResult[]> {
+  const resultsQuery = query(
+    collection(db, 'daily5sProcessResults'),
+    where('auditId', '==', auditId),
+  );
   const resultSnapshots = await getDocs(resultsQuery);
 
   const results: Daily5sPersistedResult[] = [];

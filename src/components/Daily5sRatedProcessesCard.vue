@@ -36,13 +36,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
-import {
-  DAILY5S_PROCESS_LABELS,
-  getTodaysDaily5sStatus,
-} from 'src/services/audit';
+import { DAILY5S_PROCESS_LABELS, getTodaysDaily5sStatus } from 'src/services/audit';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
+
+const props = withDefaults(
+  defineProps<{
+    refreshToken?: number;
+  }>(),
+  {
+    refreshToken: 0,
+  },
+);
 
 const authStore = useAuthStore();
 const loading = ref(false);
@@ -76,6 +82,13 @@ async function loadRatedProcesses() {
 onMounted(() => {
   void loadRatedProcesses();
 });
+
+watch(
+  () => props.refreshToken,
+  () => {
+    void loadRatedProcesses();
+  },
+);
 </script>
 
 <style scoped>

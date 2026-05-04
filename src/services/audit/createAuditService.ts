@@ -57,18 +57,21 @@ export function createAuditService(config: AuditServiceConfig) {
   /**
    * Creates a new audit document.
    *
-   * Uses date (YYYY-MM-DD) as document ID to ensure one audit per day.
+   * Uses the provided audit ID as the document ID. The optional session ID can
+   * remain stable across multiple audit documents from the same day.
    *
-   * @param auditSessionId Unique session identifier (can be same as date for now)
+   * @param auditId Unique audit document identifier
    * @param date Date string in YYYY-MM-DD format
+   * @param auditSessionId Stable day/session identifier used to group related audits
    * @param inspector User ID of the inspector
-   * @returns Document ID (same as date)
+   * @returns Document ID
    */
   async function createAudit(
-    auditSessionId: string,
+    auditId: string,
     date: string,
     turma: 'A e C' | 'B e D',
     inspector: string,
+    auditSessionId = date,
   ): Promise<string> {
     const payload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } = {
       auditSessionId,
@@ -78,10 +81,10 @@ export function createAuditService(config: AuditServiceConfig) {
       createdAt: serverTimestamp(),
     };
 
-    const auditRef = doc(db, config.auditCollection, date);
+    const auditRef = doc(db, config.auditCollection, auditId);
     await setDoc(auditRef, payload, { merge: true });
 
-    return date;
+    return auditId;
   }
 
   /**
@@ -90,8 +93,8 @@ export function createAuditService(config: AuditServiceConfig) {
    * If status is 'not_updated', image and comment are required.
    * Uploads image to Storage if provided.
    *
-   * @param auditId Date string (YYYY-MM-DD)
-   * @param auditSessionId Session identifier
+   * @param auditId Audit document identifier
+   * @param auditSessionId Stable day/session identifier
    * @param processKey Process to update
    * @param status Process status
    * @param comment Optional comment
@@ -152,7 +155,7 @@ export function createAuditService(config: AuditServiceConfig) {
     const resultPayload: DualTypeAuditResultDocument = {
       auditId,
       auditSessionId,
-      date: auditId,
+      date: auditSessionId,
       turma,
       process: processKey,
       status,

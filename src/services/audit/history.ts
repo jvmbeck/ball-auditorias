@@ -34,6 +34,85 @@ function chunkArray<T>(array: T[], size: number): T[][] {
   return chunks;
 }
 
+function toCompletedAtDate(value: unknown): Date | null {
+  return value instanceof Timestamp ? value.toDate() : null;
+}
+
+function toHistoryItem(
+  auditId: string,
+  auditDoc: DualTypeAuditDocument,
+  type: AuditType,
+  results: DualTypeAuditResultDocument[],
+  completedAt: Date | null,
+): DualTypeHistoryItem {
+  const processes = Object.fromEntries(
+    results.map((result) => [result.process, result]),
+  ) as Partial<Record<DualAuditProcessKey, DualTypeAuditResultDocument>>;
+
+  const failedProcesses = results.filter((result) => result.hasIssue).length;
+  const totalProcesses = results.length;
+  const turma = auditDoc.turma === 'A e C' || auditDoc.turma === 'B e D' ? auditDoc.turma : null;
+
+  return {
+    id: auditId,
+    type,
+    turma,
+    date: auditDoc.date,
+    dayOfWeek: deriveDayOfWeek(auditDoc.date),
+    yearMonth: deriveYearMonth(auditDoc.date),
+    completedAt,
+    failedProcesses,
+    totalProcesses,
+    hasFailures: failedProcesses > 0,
+    processes,
+  };
+}
+
+function groupDaily5sHistoryItems(
+  auditDocs: Array<DualTypeAuditDocument & { id: string }>,
+  resultsByAuditId: Map<string, DualTypeAuditResultDocument[]>,
+): DualTypeHistoryItem[] {
+  const auditsByDayId = new Map<string, Array<DualTypeAuditDocument & { id: string }>>();
+
+  auditDocs.forEach((auditDoc) => {
+    const dayId = auditDoc.auditSessionId || auditDoc.date || auditDoc.id;
+    const list = auditsByDayId.get(dayId) ?? [];
+    list.push(auditDoc);
+    auditsByDayId.set(dayId, list);
+  });
+
+  return [...auditsByDayId.entries()].map(([dayId, groupedAudits]) => {
+    const sortedAudits = [...groupedAudits].sort((left, right) => {
+      const leftTime = toCompletedAtDate(left.completedAt)?.getTime() ?? 0;
+      const rightTime = toCompletedAtDate(right.completedAt)?.getTime() ?? 0;
+      return leftTime - rightTime;
+    });
+
+    const latestAudit = sortedAudits[sortedAudits.length - 1];
+
+    if (!latestAudit) {
+      throw new Error(`Missing completed Daily 5S audit for day ${dayId}.`);
+    }
+
+    const mergedResults = new Map<DualAuditProcessKey, DualTypeAuditResultDocument>();
+
+    sortedAudits.forEach((auditDoc) => {
+      const results = resultsByAuditId.get(auditDoc.id) ?? [];
+      results.forEach((result) => {
+        mergedResults.set(result.process, result);
+      });
+    });
+
+    return toHistoryItem(
+      dayId,
+      latestAudit,
+      'daily5s',
+      [...mergedResults.values()],
+      toCompletedAtDate(latestAudit.completedAt),
+    );
+  });
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 /**
@@ -93,34 +172,18 @@ export async function getCompletedAuditHistory(
   }
 
   // 5. Map to DualTypeHistoryItem
-  const items: DualTypeHistoryItem[] = auditDocs.map((auditDoc) => {
-    const results = resultsByAuditId.get(auditDoc.id) ?? [];
-
-    const processes = Object.fromEntries(results.map((r) => [r.process, r])) as Partial<
-      Record<DualAuditProcessKey, DualTypeAuditResultDocument>
-    >;
-
-    const failedProcesses = results.filter((r) => r.hasIssue).length;
-    const totalProcesses = results.length;
-    const completedAt =
-      auditDoc.completedAt instanceof Timestamp ? auditDoc.completedAt.toDate() : null;
-
-    const turma = auditDoc.turma === 'A e C' || auditDoc.turma === 'B e D' ? auditDoc.turma : null;
-
-    return {
-      id: auditDoc.id,
-      type,
-      turma,
-      date: auditDoc.date,
-      dayOfWeek: deriveDayOfWeek(auditDoc.date),
-      yearMonth: deriveYearMonth(auditDoc.date),
-      completedAt,
-      failedProcesses,
-      totalProcesses,
-      hasFailures: failedProcesses > 0,
-      processes,
-    };
-  });
+  const items: DualTypeHistoryItem[] =
+    type === 'daily5s'
+      ? groupDaily5sHistoryItems(auditDocs, resultsByAuditId)
+      : auditDocs.map((auditDoc) =>
+          toHistoryItem(
+            auditDoc.id,
+            auditDoc,
+            type,
+            resultsByAuditId.get(auditDoc.id) ?? [],
+            toCompletedAtDate(auditDoc.completedAt),
+          ),
+        );
 
   // Sort newest first
   items.sort((a, b) => {

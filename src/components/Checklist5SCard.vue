@@ -37,11 +37,11 @@
       <q-btn
         v-if="todaysStatus?.completed"
         unelevated
-        color="positive"
-        icon-right="history"
-        label="Ver Historico"
+        color="secondary"
+        icon-right="refresh"
+        label="Nova Daily 5S"
         size="md"
-        :to="{ name: 'audit-history' }"
+        :to="{ name: 'daily5s-audit-page' }"
         class="full-width"
       />
 

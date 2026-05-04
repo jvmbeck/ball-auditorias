@@ -91,6 +91,10 @@
         </div>
       </div>
 
+      <section class="q-mb-lg">
+        <Daily5sRatedProcessesCard :refresh-token="ratedProcessesRefreshToken" />
+      </section>
+
       <section class="footer-actions">
         <q-btn
           size="lg"
@@ -112,6 +116,7 @@ import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import Daily5sProcessCard from 'src/components/Daily5sProcessCard.vue';
+import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
 import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit';
 import { useDaily5sAuditStore } from 'src/stores/daily5sAudit.store';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
@@ -120,10 +125,20 @@ const $q = useQuasar();
 const router = useRouter();
 const daily5sStore = useDaily5sAuditStore();
 
-const { turma, selectedProcessKeys, processState, processFiles, savedProcesses, loading, allSelectedValid, selectedCount, ratedCount } =
-  storeToRefs(daily5sStore);
+const {
+  turma,
+  selectedProcessKeys,
+  processState,
+  processFiles,
+  savedProcesses,
+  loading,
+  allSelectedValid,
+  selectedCount,
+  ratedCount,
+} = storeToRefs(daily5sStore);
 
 const pageError = ref<string | null>(null);
+const ratedProcessesRefreshToken = ref(0);
 
 const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
   { label: 'A e C', value: 'A e C' },
@@ -159,6 +174,7 @@ async function saveCurrentProcess(processKey: Daily5sAuditProcessKey): Promise<v
 
   try {
     await daily5sStore.saveProcess(processKey);
+    ratedProcessesRefreshToken.value += 1;
     $q.notify({
       type: 'positive',
       message: `Processo ${processKey} salvo com sucesso.`,

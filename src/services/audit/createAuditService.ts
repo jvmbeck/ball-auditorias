@@ -10,6 +10,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type {
   AuditServiceConfig,
+  Daily5sRatingValue,
   DualAuditProcessKey,
   DualTypeAuditDocument,
   DualTypeAuditResultDocument,
@@ -22,6 +23,7 @@ interface UpdateProcessOptions {
   issueTargets?: PrinterCheckKey[];
   printerChecks?: PrinterChecks;
   printerFiles?: Partial<Record<PrinterCheckKey, File | null>>;
+  rating?: Daily5sRatingValue;
 }
 
 /**
@@ -155,6 +157,7 @@ export function createAuditService(config: AuditServiceConfig) {
       process: processKey,
       status,
       hasIssue,
+      rating: options?.rating ?? null,
       comment: hasIssue ? comment?.trim() || null : null,
       imageUrl: hasIssue ? imageUrl : null,
       printerChecks,

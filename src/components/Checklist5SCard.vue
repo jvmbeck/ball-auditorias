@@ -2,35 +2,97 @@
   <q-card flat bordered class="checklist-card">
     <q-card-section>
       <div class="header q-mb-md">
-        <q-icon name="checklist" size="28px" color="secondary" class="q-mr-sm" />
-        <span class="title">Checklist 5S</span>
+        <q-icon name="task_alt" size="28px" color="secondary" class="q-mr-sm" />
+        <span class="title">Daily 5S</span>
       </div>
 
       <p class="description q-mb-md">
-        Simula o fluxo 5S com um formulário dedicado para os processos de produção.
+        Selecione os processos que deseja avaliar hoje e aplique notas 1, 3 ou 5 para cada area.
       </p>
 
       <div class="status-row q-mb-md">
-        <q-chip dense color="grey-3" text-color="grey-8" icon="schedule">Em breve</q-chip>
+        <q-chip
+          v-if="todaysStatus?.completed"
+          dense
+          color="positive"
+          text-color="white"
+          icon="task_alt"
+        >
+          Concluida hoje
+        </q-chip>
+        <q-chip
+          v-else-if="todaysStatus"
+          dense
+          color="primary"
+          text-color="white"
+          icon="pending_actions"
+        >
+          Em andamento
+        </q-chip>
+        <q-chip v-else dense color="grey-3" text-color="grey-8" icon="schedule">
+          Nao iniciada hoje
+        </q-chip>
       </div>
 
       <q-btn
+        v-if="todaysStatus?.completed"
+        unelevated
+        color="positive"
+        icon-right="history"
+        label="Ver Historico"
+        size="md"
+        :to="{ name: 'audit-history' }"
+        class="full-width"
+      />
+
+      <q-btn
+        v-else-if="todaysStatus"
+        unelevated
+        color="primary"
+        icon-right="arrow_forward"
+        label="Continuar Daily 5S"
+        size="md"
+        :to="{ name: 'daily5s-audit-page' }"
+        class="full-width"
+      />
+
+      <q-btn
+        v-else
         unelevated
         color="secondary"
         icon-right="arrow_forward"
-        label="Começar Checklist 5S"
+        label="Iniciar Daily 5S"
         size="md"
+        :to="{ name: 'daily5s-audit-page' }"
         class="full-width"
-        @click="handlePlaceholderAction"
       />
     </q-card-section>
   </q-card>
 </template>
 
 <script setup lang="ts">
-function handlePlaceholderAction() {
-  // Placeholder action: intentionally does nothing for now.
-}
+import { onMounted, ref } from 'vue';
+import { getTodaysDaily5sStatus } from 'src/services/audit';
+import { useAuthStore } from 'src/stores/auth.store';
+
+const authStore = useAuthStore();
+
+const todaysStatus = ref<{
+  auditId: string;
+  turma: 'A e C' | 'B e D' | null;
+  completed: boolean;
+  ratedProcessKeys: string[];
+} | null>(null);
+
+onMounted(async () => {
+  const inspectorId = authStore.firebaseUser?.uid;
+  if (!inspectorId) {
+    todaysStatus.value = null;
+    return;
+  }
+
+  todaysStatus.value = await getTodaysDaily5sStatus(inspectorId);
+});
 </script>
 
 <style scoped>

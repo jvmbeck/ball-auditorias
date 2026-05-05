@@ -20,25 +20,46 @@
       </div>
 
       <div v-else class="list-shell">
-        <q-list dense separator>
-          <q-item v-for="process in ratedProcesses" :key="process.key">
-            <q-item-section avatar>
-              <q-icon name="check_circle" color="positive" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label>{{ process.label }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
+        <div v-if="ratedFrontEndProcesses.length" class="section-list">
+          <div class="section-title">Front End</div>
+          <q-list dense separator>
+            <q-item v-for="process in ratedFrontEndProcesses" :key="process.key">
+              <q-item-section avatar>
+                <q-icon name="check_circle" color="positive" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ process.label }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </div>
+
+        <div v-if="ratedBackEndProcesses.length" class="section-list">
+          <div class="section-title">Back End</div>
+          <q-list dense separator>
+            <q-item v-for="process in ratedBackEndProcesses" :key="process.key">
+              <q-item-section avatar>
+                <q-icon name="check_circle" color="positive" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ process.label }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </div>
       </div>
     </q-card-section>
   </q-card>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
-import { DAILY5S_PROCESS_LABELS, getTodaysDaily5sStatus } from 'src/services/audit';
+import { getTodaysDaily5sStatus } from 'src/services/audit';
+import {
+  DAILY5S_PROCESS_LABELS,
+  DAILY5S_PROCESS_SECTION_BY_KEY,
+} from 'src/services/audit/daily5sDefinitions';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
 const props = withDefaults(
@@ -53,6 +74,18 @@ const props = withDefaults(
 const authStore = useAuthStore();
 const loading = ref(false);
 const ratedProcesses = ref<Array<{ key: Daily5sAuditProcessKey; label: string }>>([]);
+
+const ratedFrontEndProcesses = computed(() =>
+  ratedProcesses.value.filter(
+    (process) => DAILY5S_PROCESS_SECTION_BY_KEY[process.key] === 'frontEnd',
+  ),
+);
+
+const ratedBackEndProcesses = computed(() =>
+  ratedProcesses.value.filter(
+    (process) => DAILY5S_PROCESS_SECTION_BY_KEY[process.key] === 'backEnd',
+  ),
+);
 
 async function loadRatedProcesses() {
   const inspectorId = authStore.firebaseUser?.uid;
@@ -119,6 +152,20 @@ watch(
   overflow-y: auto;
   border: 1px solid #e6ecef;
   border-radius: 12px;
+  padding: 10px;
+}
+
+.section-list + .section-list {
+  margin-top: 12px;
+}
+
+.section-title {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5f7077;
+  font-weight: 700;
 }
 
 .state-box {

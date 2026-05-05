@@ -90,7 +90,7 @@ export const useDaily5sAuditStore = defineStore(
     const selectedCount = computed(() => selectedProcessKeys.value.length);
 
     const ratedCount = computed(
-      () => selectedProcessKeys.value.filter((key) => processState[key].rating !== null).length,
+      () => selectedProcessKeys.value.filter((key) => processState[key]?.rating !== null).length,
     );
 
     const allSelectedValid = computed(() => {
@@ -99,7 +99,11 @@ export const useDaily5sAuditStore = defineStore(
       }
 
       return selectedProcessKeys.value.every((key) => {
-        const { rating, comment } = processState[key];
+        const entry = processState[key];
+        if (!entry || entry.rating === null) {
+          return false;
+        }
+        const { rating, comment } = entry;
         if (rating === null) {
           return false;
         }
@@ -159,8 +163,10 @@ export const useDaily5sAuditStore = defineStore(
       turma.value = value;
     }
 
+    const DAILY5S_KEY_SET = new Set(DAILY5S_KEYS);
+
     function setSelectedProcesses(processKeys: Daily5sAuditProcessKey[]): void {
-      const unique = [...new Set(processKeys)];
+      const unique = [...new Set(processKeys)].filter((key) => DAILY5S_KEY_SET.has(key));
       selectedProcessKeys.value = unique;
     }
 
@@ -413,7 +419,7 @@ export const useDaily5sAuditStore = defineStore(
   },
   {
     persist: {
-      key: 'daily-5s-audit-form-draft-v1',
+      key: 'daily-5s-audit-form-draft-v3',
       pick: [
         'auditId',
         'turma',

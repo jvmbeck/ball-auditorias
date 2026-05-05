@@ -1,7 +1,10 @@
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
+export type Daily5sProcessSection = 'frontEnd' | 'backEnd';
+
 export interface Daily5sProcessDefinition {
   key: Daily5sAuditProcessKey;
+  section: Daily5sProcessSection;
   label: string;
   guidance: {
     1: string;
@@ -10,69 +13,209 @@ export interface Daily5sProcessDefinition {
   };
 }
 
+const DEFAULT_DAILY5S_GUIDANCE = {
+  1: 'Area desorganizada, com sujeira visivel e materiais fora do local definido.',
+  3: 'Area parcialmente organizada, com pequenos desvios de limpeza ou sinalizacao.',
+  5: 'Area exemplar, limpa, organizada e com padrao visual totalmente mantido.',
+} as const;
+
 export const DAILY5S_PROCESS_DEFINITIONS: Daily5sProcessDefinition[] = [
+  { key: 'chs', section: 'frontEnd', label: 'CHS', guidance: DEFAULT_DAILY5S_GUIDANCE },
   {
-    key: 'minsters',
-    label: 'Minsters',
-    guidance: {
-      1: 'Area desorganizada, com sujeira visivel e materiais fora do local definido.',
-      3: 'Area parcialmente organizada, com pequenos desvios de limpeza ou sinalizacao.',
-      5: 'Area exemplar, limpa, organizada e com padrao visual totalmente mantido.',
-    },
+    key: 'areaDeBobina',
+    section: 'frontEnd',
+    label: 'Area de Bobina',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'bodyMakers11to14',
-    label: 'Body Makers 11 a 14',
-    guidance: {
-      1: 'Equipamentos e entorno sem padrao de 5S, com risco de desperdicio e retrabalho.',
-      3: 'Padrao intermediario: rotina 5S aplicada, mas com inconsistencias pontuais.',
-      5: 'Padrao completo de 5S: limpeza, organizacao e disciplina visual consistentes.',
-    },
+    key: 'minster',
+    section: 'frontEnd',
+    label: 'Minster',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  { key: 'bms', section: 'frontEnd', label: "BM's", guidance: DEFAULT_DAILY5S_GUIDANCE },
+  {
+    key: 'pisoDasBms',
+    section: 'frontEnd',
+    label: "Piso das BM's",
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'bodyMakers15to18',
-    label: 'Body Makers 15 a 18',
-    guidance: {
-      1: 'Desvios criticos de organizacao e limpeza, exigindo acao corretiva imediata.',
-      3: 'Conformidade parcial, com oportunidades de melhoria evidentes.',
-      5: 'Conformidade total com o padrao 5S esperado para a area.',
-    },
+    key: 'plataformaBms',
+    section: 'frontEnd',
+    label: "Plataforma BM's",
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'bodyMakers19to23',
-    label: 'Body Makers 19 a 23',
-    guidance: {
-      1: 'Condicao inadequada de 5S, com itens sem identificacao e area comprometida.',
-      3: 'Condicao aceitavel, mas sem consistencia total no padrao diario.',
-      5: 'Condicao de referencia, com excelente padronizacao, limpeza e arranjo.',
-    },
+    key: 'recuperadorDeLataFrontEnd',
+    section: 'frontEnd',
+    label: 'Recuperador de lata do Front End',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'bodyMakers24to31',
-    label: 'Body Makers 24 a 31',
-    guidance: {
-      1: 'Falta de padrao 5S visivel na area e necessidade de intervencao.',
-      3: 'Padrao parcialmente atendido, com desvios moderados.',
-      5: 'Padrao 5S plenamente atendido com manutencao visual e operacional adequada.',
-    },
+    key: 'pickUpSystemFrontEnd',
+    section: 'frontEnd',
+    label: 'Pick Up Sistem do Front End',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'printer1',
-    label: 'Printer 1',
-    guidance: {
-      1: 'Area com falhas relevantes de 5S, sem condicao minima esperada.',
-      3: 'Area atende parcialmente ao 5S, com ajustes necessarios.',
-      5: 'Area atende plenamente ao 5S, com boa pratica sustentada.',
-    },
+    key: 'mezaninoFrontMinsterAtePt',
+    section: 'frontEnd',
+    label: 'Mezanino Front (Minster ate a PT)',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
   {
-    key: 'printer2e3',
-    label: 'Printer 2 e 3',
-    guidance: {
-      1: 'Condicao critica de 5S, exigindo justificativa e evidencia imediata.',
-      3: 'Condicao intermediaria, com melhorias necessarias para atingir o padrao.',
-      5: 'Condicao ideal de 5S, com area limpa, organizada e estabilizada.',
-    },
+    key: 'mezaninoFrontAreaDoT',
+    section: 'frontEnd',
+    label: 'Mezanino Front (Area do T)',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'mezaninoSuperiorLavadora2',
+    section: 'frontEnd',
+    label: 'Mezanino Superior Lavadora 2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'compactadora',
+    section: 'frontEnd',
+    label: 'Compactadora',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  { key: 'sos1', section: 'frontEnd', label: 'SOS 1', guidance: DEFAULT_DAILY5S_GUIDANCE },
+  { key: 'sos2', section: 'frontEnd', label: 'SOS 2', guidance: DEFAULT_DAILY5S_GUIDANCE },
+  {
+    key: 'areaDaOsmose',
+    section: 'frontEnd',
+    label: 'Area da Osmose',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'lavadoras',
+    section: 'frontEnd',
+    label: 'Lavadoras',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'recuperadoresDaLavadora',
+    section: 'frontEnd',
+    label: 'Recuperadores da lavadora',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'singleFilerPts1e2',
+    section: 'backEnd',
+    label: "Single filer das PT's 1 e 2",
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'singleFilerPt3',
+    section: 'backEnd',
+    label: 'Single filer da PT3',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'saidaPinOvensInferior3Pts',
+    section: 'backEnd',
+    label: "Saida dos Pin Ovens inferior (3 PT's)",
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'saidaPinOvensSuperior3Pts',
+    section: 'backEnd',
+    label: "Saida dos Pin Ovens superior (3 PT's)",
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'areaEntrePt2ePt3',
+    section: 'backEnd',
+    label: 'Area entre PT2 e PT3',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'areaEntrePt1ePt2',
+    section: 'backEnd',
+    label: 'Area entre PT1 e PT2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'mezaninoEntradaIsLinha2',
+    section: 'backEnd',
+    label: 'Mezanino entrada do IS linha 2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'mezaninoDosIs',
+    section: 'backEnd',
+    label: 'Mezanino dos IS',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'mezaninoSaidaPulmaoPt2e3',
+    section: 'backEnd',
+    label: 'Mezanino - Saida do pulmao das PT 2 e 3',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'presscoMezanino',
+    section: 'backEnd',
+    label: 'Pressco (mezanino)',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'mezaninoBidiNc2',
+    section: 'backEnd',
+    label: 'Mezanino BIDI NC2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  { key: 'necker', section: 'backEnd', label: 'Necker', guidance: DEFAULT_DAILY5S_GUIDANCE },
+  {
+    key: 'pickupSystem',
+    section: 'backEnd',
+    label: 'Pickup System',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'recuperadorDeLatasNc2',
+    section: 'backEnd',
+    label: 'Recuperador de latas NC2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'finalDeLinha',
+    section: 'backEnd',
+    label: 'Final de linha',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'corredorEntrePaletizadoras',
+    section: 'backEnd',
+    label: 'Corredor entre Paletizadoras',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'waxerNc1',
+    section: 'backEnd',
+    label: 'Waxer NC 1',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'waxerNc2',
+    section: 'backEnd',
+    label: 'Waxer NC 2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'limpezaFossoElevadorFrontEndLinha2',
+    section: 'backEnd',
+    label: 'Limpeza fosso elevador do front end linha 2',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
+  },
+  {
+    key: 'areaDosInsideSprays',
+    section: 'backEnd',
+    label: 'Area dos Inside Sprays',
+    guidance: DEFAULT_DAILY5S_GUIDANCE,
   },
 ];
 
@@ -84,6 +227,28 @@ export const DAILY5S_PROCESS_LABELS: Record<Daily5sAuditProcessKey, string> =
     },
     {} as Record<Daily5sAuditProcessKey, string>,
   );
+
+export const DAILY5S_PROCESS_SECTION_LABELS: Record<Daily5sProcessSection, string> = {
+  frontEnd: 'Front End',
+  backEnd: 'Back End',
+};
+
+export const DAILY5S_PROCESS_SECTION_BY_KEY: Record<Daily5sAuditProcessKey, Daily5sProcessSection> =
+  DAILY5S_PROCESS_DEFINITIONS.reduce(
+    (acc, process) => {
+      acc[process.key] = process.section;
+      return acc;
+    },
+    {} as Record<Daily5sAuditProcessKey, Daily5sProcessSection>,
+  );
+
+export const DAILY5S_FRONTEND_PROCESS_DEFINITIONS = DAILY5S_PROCESS_DEFINITIONS.filter(
+  (process) => process.section === 'frontEnd',
+);
+
+export const DAILY5S_BACKEND_PROCESS_DEFINITIONS = DAILY5S_PROCESS_DEFINITIONS.filter(
+  (process) => process.section === 'backEnd',
+);
 
 export function isDaily5sProcessKey(value: string): value is Daily5sAuditProcessKey {
   return DAILY5S_PROCESS_DEFINITIONS.some((process) => process.key === value);

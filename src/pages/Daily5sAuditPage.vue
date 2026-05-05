@@ -26,18 +26,33 @@
           />
         </div>
 
-        <div class="col-12 col-md-8">
+        <div class="col-12 col-md-4">
           <q-select
-            :model-value="selectedProcesses"
+            :model-value="selectedFrontEndProcesses"
             multiple
             outlined
             dense
             emit-value
             map-options
             use-chips
-            :options="processOptions"
-            label="Selecione os processos da auditoria"
-            @update:model-value="onSelectedProcessesChange"
+            :options="frontEndProcessOptions"
+            label="Processos Front End"
+            @update:model-value="onFrontEndProcessesChange"
+          />
+        </div>
+
+        <div class="col-12 col-md-4">
+          <q-select
+            :model-value="selectedBackEndProcesses"
+            multiple
+            outlined
+            dense
+            emit-value
+            map-options
+            use-chips
+            :options="backEndProcessOptions"
+            label="Processos Back End"
+            @update:model-value="onBackEndProcessesChange"
           />
         </div>
       </section>
@@ -117,7 +132,11 @@ import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import Daily5sProcessCard from 'src/components/Daily5sProcessCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
-import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit';
+import {
+  DAILY5S_BACKEND_PROCESS_DEFINITIONS,
+  DAILY5S_FRONTEND_PROCESS_DEFINITIONS,
+  DAILY5S_PROCESS_DEFINITIONS,
+} from 'src/services/audit/daily5sDefinitions';
 import { useDaily5sAuditStore } from 'src/stores/daily5sAudit.store';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
@@ -150,14 +169,35 @@ const selectedTurma = computed<'A e C' | 'B e D' | null>({
   set: (value) => daily5sStore.setTurma(value),
 });
 
-const processOptions = computed(() =>
-  DAILY5S_PROCESS_DEFINITIONS.map((process) => ({
+const FRONT_END_PROCESS_KEY_SET = new Set(
+  DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => process.key),
+);
+
+const BACK_END_PROCESS_KEY_SET = new Set(
+  DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => process.key),
+);
+
+const frontEndProcessOptions = computed(() =>
+  DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => ({
     label: process.label,
     value: process.key,
   })),
 );
 
-const selectedProcesses = computed(() => selectedProcessKeys.value);
+const backEndProcessOptions = computed(() =>
+  DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => ({
+    label: process.label,
+    value: process.key,
+  })),
+);
+
+const selectedFrontEndProcesses = computed(() =>
+  selectedProcessKeys.value.filter((key) => FRONT_END_PROCESS_KEY_SET.has(key)),
+);
+
+const selectedBackEndProcesses = computed(() =>
+  selectedProcessKeys.value.filter((key) => BACK_END_PROCESS_KEY_SET.has(key)),
+);
 
 const selectedProcessDefinitions = computed(() =>
   DAILY5S_PROCESS_DEFINITIONS.filter((process) => selectedProcessKeys.value.includes(process.key)),
@@ -165,8 +205,14 @@ const selectedProcessDefinitions = computed(() =>
 
 const isBusy = computed(() => loading.value);
 
-function onSelectedProcessesChange(keys: Daily5sAuditProcessKey[]) {
-  daily5sStore.setSelectedProcesses(keys);
+function onFrontEndProcessesChange(keys: Daily5sAuditProcessKey[]) {
+  const nextSelection = [...keys, ...selectedBackEndProcesses.value];
+  daily5sStore.setSelectedProcesses(nextSelection);
+}
+
+function onBackEndProcessesChange(keys: Daily5sAuditProcessKey[]) {
+  const nextSelection = [...selectedFrontEndProcesses.value, ...keys];
+  daily5sStore.setSelectedProcesses(nextSelection);
 }
 
 async function saveCurrentProcess(processKey: Daily5sAuditProcessKey): Promise<void> {

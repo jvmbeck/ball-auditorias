@@ -77,7 +77,10 @@
       <!-- Checklist 5S tab -->
       <div v-show="activeTab === 'checklist5s'">
         <section class="q-mb-xl">
-          <Checklist5SCard />
+          <div class="daily5s-grid">
+            <Checklist5SCard />
+            <Daily5sRatedProcessesCard />
+          </div>
         </section>
 
         <!-- Placeholder: 5S-specific analytics will be added in a later phase -->
@@ -101,6 +104,7 @@
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
+import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
 import DailyAuditCard from 'src/components/DailyAuditCard.vue';
 import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
 import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
@@ -216,6 +220,12 @@ async function handleRefreshAnalytics() {
   width: 100%;
 }
 
+.daily5s-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.1fr) minmax(280px, 0.9fr);
+  gap: 1.25rem;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .analytics-header {
@@ -234,6 +244,10 @@ async function handleRefreshAnalytics() {
   }
 
   .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily5s-grid {
     grid-template-columns: 1fr;
   }
 }

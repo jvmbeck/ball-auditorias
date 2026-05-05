@@ -16,6 +16,11 @@ const routes: RouteRecordRaw[] = [
         name: 'audit-page',
         component: () => import('pages/AuditPage.vue'),
       },
+      {
+        path: 'daily-5s',
+        name: 'daily5s-audit-page',
+        component: () => import('pages/Daily5sAuditPage.vue'),
+      },
     ],
     meta: { requiresAuth: true },
   },

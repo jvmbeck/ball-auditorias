@@ -39,10 +39,10 @@
               <q-chip
                 dense
                 text-color="white"
-                :color="getProcessChipColor(getProcessResult(process.key)?.status)"
+                :color="getProcessChipColor(getProcessResult(process.key))"
                 class="q-mb-sm"
               >
-                {{ getProcessStatusLabel(getProcessResult(process.key)?.status) }}
+                {{ getProcessStatusLabel(getProcessResult(process.key)) }}
               </q-chip>
 
               <q-btn
@@ -73,7 +73,6 @@ import { useQuasar } from 'quasar';
 import { formatAuditDate, formatDayOfWeek } from 'src/utils/dateFormatting';
 import type {
   AuditType,
-  AuditProcessStatus,
   DualAuditProcessKey,
   DualTypeAuditResultDocument,
 } from 'src/types/audit';
@@ -123,24 +122,44 @@ function close() {
   emit('update:modelValue', false);
 }
 
-function getProcessStatusLabel(status: AuditProcessStatus | undefined): string {
-  if (status === 'updated') {
+function getProcessStatusLabel(result: DualTypeAuditResultDocument | undefined): string {
+  if (!result) {
+    return 'Nao Registrado';
+  }
+
+  if (result.rating === 1 || result.rating === 3 || result.rating === 5) {
+    return `Nota ${result.rating}`;
+  }
+
+  if (result.status === 'updated') {
     return 'Atualizado';
   }
 
-  if (status === 'not_updated') {
+  if (result.status === 'not_updated') {
     return 'Problema Encontrado';
   }
 
-  return 'Não Registrado';
+  return 'Nao Registrado';
 }
 
-function getProcessChipColor(status: AuditProcessStatus | undefined): string {
-  if (status === 'updated') {
+function getProcessChipColor(result: DualTypeAuditResultDocument | undefined): string {
+  if (!result) {
+    return 'grey-6';
+  }
+
+  if (result.rating === 1) {
+    return 'negative';
+  }
+
+  if (result.rating === 3) {
+    return 'warning';
+  }
+
+  if (result.rating === 5 || result.status === 'updated') {
     return 'positive';
   }
 
-  if (status === 'not_updated') {
+  if (result.status === 'not_updated') {
     return 'negative';
   }
 
@@ -156,14 +175,24 @@ function getClipboardLine(processKey: string, label: string): string {
   const process = getProcessResult(processKey);
   const turmaSuffix = props.audit?.turma ? ` turma ${props.audit.turma}` : '';
 
-  if (!process || process.status === null) {
-    return `- ${label} - ⚪ Não registrado${turmaSuffix}`;
+  if (!process) {
+    return `- ${label} - ⚪ Nao registrado${turmaSuffix}`;
+  }
+
+  const explanation = process.comment?.trim();
+
+  if (process.rating === 1 || process.rating === 3 || process.rating === 5) {
+    const icon = process.rating === 1 ? '🔴' : process.rating === 3 ? '🟡' : '🟢';
+    const statusText = `Nota ${process.rating}`;
+
+    return explanation && explanation.length > 0
+      ? `- ${label} - ${icon} ${statusText}${turmaSuffix} ${explanation}`
+      : `- ${label} - ${icon} ${statusText}${turmaSuffix}`;
   }
 
   const isUpdated = process.status === 'updated';
   const icon = isUpdated ? '🟢' : '🔴';
   const statusText = isUpdated ? 'Atualizado' : 'Desatualizado';
-  const explanation = process.comment?.trim();
 
   return explanation && explanation.length > 0
     ? `- ${label} - ${icon} ${statusText}${turmaSuffix} ${explanation}`

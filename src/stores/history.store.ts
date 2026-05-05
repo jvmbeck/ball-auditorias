@@ -18,6 +18,10 @@ const AUDIT_TYPE_REGISTRY: Record<AuditType, AuditServiceConfig> = {
     auditCollection: 'board5sAudits',
     resultsCollection: 'board5sProcessResults',
   },
+  daily5s: {
+    auditCollection: 'daily5sAudits',
+    resultsCollection: 'daily5sProcessResults',
+  },
 };
 
 export const AUDIT_TYPES = Object.keys(AUDIT_TYPE_REGISTRY) as AuditType[];

@@ -9,3 +9,6 @@ export * from './analytics.processFailureRate';
 export * from './createAuditService';
 export * from './checklistAuditService';
 export * from './boardAuditService';
+export * from './daily5sAuditService';
+export * from './daily5sStatus';
+export * from './daily5sDefinitions';

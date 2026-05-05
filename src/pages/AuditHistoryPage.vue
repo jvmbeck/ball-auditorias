@@ -161,6 +161,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import AuditDetailsDialog from 'src/components/AuditDetailsDialog.vue';
+import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit';
 import { useHistoryStore } from 'src/stores/history.store';
 import { formatAuditDate, formatDayOfWeek } from 'src/utils/dateFormatting';
 import type { AuditType, DualAuditProcessKey, DualTypeAuditResultDocument } from 'src/types/audit';
@@ -187,6 +188,7 @@ type HistoryAuditItem = {
 const TYPE_LABELS: Record<AuditType, string> = {
   rto: 'RTO',
   board5s: 'Quadro 5S',
+  daily5s: 'Daily 5S',
 };
 
 const PROCESS_DEFINITIONS_BY_TYPE: Record<AuditType, Array<{ key: string; label: string }>> = {
@@ -207,6 +209,10 @@ const PROCESS_DEFINITIONS_BY_TYPE: Record<AuditType, Array<{ key: string; label:
     { key: 'printer1', label: 'Printer 1' },
     { key: 'printer2e3', label: 'Printer 2 e 3' },
   ],
+  daily5s: DAILY5S_PROCESS_DEFINITIONS.map((process) => ({
+    key: process.key,
+    label: process.label,
+  })),
 };
 
 const historyStore = useHistoryStore();
@@ -245,7 +251,8 @@ const turmaFilterOptions: Array<{ label: string; value: TurmaFilter }> = [
 const auditHistory = computed<HistoryAuditItem[]>(() => {
   const rto = historyStore.historyByType.rto ?? [];
   const board5s = historyStore.historyByType.board5s ?? [];
-  return [...rto, ...board5s].sort((a, b) => {
+  const daily5s = historyStore.historyByType.daily5s ?? [];
+  return [...rto, ...board5s, ...daily5s].sort((a, b) => {
     const aTime = a.completedAt?.getTime() ?? 0;
     const bTime = b.completedAt?.getTime() ?? 0;
     return bTime - aTime;

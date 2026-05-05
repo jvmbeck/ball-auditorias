@@ -2,7 +2,9 @@ import type { FieldValue, Timestamp } from 'firebase/firestore';
 
 export type AuditStatus = 'in_progress' | 'completed';
 
-export type AuditType = 'rto' | 'board5s';
+export type AuditType = 'rto' | 'board5s' | 'daily5s';
+
+export type Daily5sRatingValue = 1 | 3 | 5;
 
 export type PrinterCheckKey = 'printer1' | 'printer2' | 'printer3';
 
@@ -23,7 +25,49 @@ export type Board5sAuditProcessKey =
   | 'printer1'
   | 'printer2e3';
 
-export type DualAuditProcessKey = RtoAuditProcessKey | Board5sAuditProcessKey;
+export type Daily5sAuditProcessKey =
+  | 'chs'
+  | 'areaDeBobina'
+  | 'minster'
+  | 'bms'
+  | 'pisoDasBms'
+  | 'plataformaBms'
+  | 'recuperadorDeLataFrontEnd'
+  | 'pickUpSystemFrontEnd'
+  | 'mezaninoFrontMinsterAtePt'
+  | 'mezaninoFrontAreaDoT'
+  | 'mezaninoSuperiorLavadora2'
+  | 'compactadora'
+  | 'sos1'
+  | 'sos2'
+  | 'areaDaOsmose'
+  | 'lavadoras'
+  | 'recuperadoresDaLavadora'
+  | 'singleFilerPts1e2'
+  | 'singleFilerPt3'
+  | 'saidaPinOvensInferior3Pts'
+  | 'saidaPinOvensSuperior3Pts'
+  | 'areaEntrePt2ePt3'
+  | 'areaEntrePt1ePt2'
+  | 'mezaninoEntradaIsLinha2'
+  | 'mezaninoDosIs'
+  | 'mezaninoSaidaPulmaoPt2e3'
+  | 'presscoMezanino'
+  | 'mezaninoBidiNc2'
+  | 'necker'
+  | 'pickupSystem'
+  | 'recuperadorDeLatasNc2'
+  | 'finalDeLinha'
+  | 'corredorEntrePaletizadoras'
+  | 'waxerNc1'
+  | 'waxerNc2'
+  | 'limpezaFossoElevadorFrontEndLinha2'
+  | 'areaDosInsideSprays';
+
+export type DualAuditProcessKey =
+  | RtoAuditProcessKey
+  | Board5sAuditProcessKey
+  | Daily5sAuditProcessKey;
 
 // Legacy single-audit key type (RTO-only)
 export type AuditProcessKey = RtoAuditProcessKey;
@@ -161,6 +205,7 @@ export interface DualTypeAuditResultDocument {
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
   hasIssue: boolean; // status === 'not_updated'
+  rating?: Daily5sRatingValue | null;
   comment?: string | null;
   imageUrl?: string | null;
   printerChecks?: PrinterChecks | null;

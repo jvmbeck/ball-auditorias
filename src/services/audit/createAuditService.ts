@@ -22,8 +22,26 @@ import type {
 interface UpdateProcessOptions {
   issueTargets?: PrinterCheckKey[];
   printerChecks?: PrinterChecks;
-  printerFiles?: Partial<Record<PrinterCheckKey, File | null>>;
+  printerFiles?: Partial<Record<PrinterCheckKey, File[] | null>>;
   rating?: Daily5sRatingValue;
+}
+
+function normalizeImageUrls(imageUrls: unknown, imageUrl: unknown): string[] {
+  const normalized = new Set<string>();
+
+  if (Array.isArray(imageUrls)) {
+    imageUrls.forEach((value) => {
+      if (typeof value === 'string' && value.length > 0) {
+        normalized.add(value);
+      }
+    });
+  }
+
+  if (typeof imageUrl === 'string' && imageUrl.length > 0) {
+    normalized.add(imageUrl);
+  }
+
+  return [...normalized];
 }
 
 /**
@@ -34,10 +52,20 @@ interface UpdateProcessOptions {
  * @returns Object with methods for managing audits
  */
 export function createAuditService(config: AuditServiceConfig) {
+  function createUniqueFileName(file: File): string {
+    const safeOriginalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const randomSuffix =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Math.random().toString(36).slice(2)}_${Date.now()}`;
+
+    return `${Date.now()}_${randomSuffix}_${safeOriginalName}`;
+  }
+
   /**
    * Uploads an image to Firebase Storage and returns its download URL.
    *
-   * Path format: `audits/{auditType}/{auditId}/{processKey}/{timestamp}.jpg`
+   * Path format: `audits/{auditType}/{auditId}/{processKey}/{timestamp}_{uuid}_{filename}`
    */
   async function uploadImage(
     auditId: string,
@@ -45,7 +73,7 @@ export function createAuditService(config: AuditServiceConfig) {
     file: File,
     evaluationType?: string,
   ): Promise<string> {
-    const fileName = `${Date.now()}.jpg`;
+    const fileName = createUniqueFileName(file);
     const evaluationPath = evaluationType ? `/${evaluationType}` : '';
     const storagePath = `audits/${config.auditCollection}/${auditId}/${processKey}${evaluationPath}/${fileName}`;
     const imageRef = ref(storage, storagePath);
@@ -91,14 +119,14 @@ export function createAuditService(config: AuditServiceConfig) {
    * Updates a single process in an audit and creates a result document.
    *
    * If status is 'not_updated', image and comment are required.
-   * Uploads image to Storage if provided.
+   * Uploads images to Storage if provided.
    *
    * @param auditId Audit document identifier
    * @param auditSessionId Stable day/session identifier
    * @param processKey Process to update
    * @param status Process status
    * @param comment Optional comment
-   * @param imageFile Optional image file
+   * @param imageFiles Optional image files
    */
   async function updateProcess(
     auditId: string,
@@ -107,46 +135,125 @@ export function createAuditService(config: AuditServiceConfig) {
     processKey: DualAuditProcessKey,
     status: UpdatableProcessStatus,
     comment: string | null = null,
-    imageFile: File | null = null,
+    imageFiles: File[] | null = null,
     options?: UpdateProcessOptions,
   ): Promise<void> {
-    let imageUrl: string | null = null;
+    const resultId = `${auditId}_${processKey}`;
+    const resultRef = doc(db, config.resultsCollection, resultId);
+    const existingResultSnapshot = await getDoc(resultRef);
+    const existingResult = existingResultSnapshot.exists()
+      ? (existingResultSnapshot.data() as Partial<DualTypeAuditResultDocument>)
+      : null;
+
+    let processImageUrls = normalizeImageUrls(existingResult?.imageUrls, existingResult?.imageUrl);
     let printerChecks = options?.printerChecks ?? null;
 
-    // Upload image if provided
-    if (imageFile) {
-      imageUrl = await uploadImage(auditId, processKey, imageFile);
+    // Upload process images, preserving previous ones.
+    if (status === 'not_updated' && imageFiles?.length) {
+      const uploadedImageUrls = await Promise.all(
+        imageFiles.map((file) => uploadImage(auditId, processKey, file)),
+      );
+      processImageUrls = [...processImageUrls, ...uploadedImageUrls];
+    }
+
+    if (status !== 'not_updated') {
+      processImageUrls = [];
     }
 
     if (printerChecks && options?.printerFiles) {
-      const uploadedPrinterChecks = await Promise.all(
-        Object.entries(printerChecks).map(async ([printerKey, printerCheck]) => {
-          const typedPrinterKey = printerKey as PrinterCheckKey;
-          const printerFile = options.printerFiles?.[typedPrinterKey] ?? null;
+      const existingPrinterChecks = existingResult?.printerChecks ?? null;
+      const printerEntries = Object.entries(printerChecks) as Array<
+        [PrinterCheckKey, PrinterChecks[PrinterCheckKey]]
+      >;
 
-          if (printerCheck.status === 'not_updated' && printerFile) {
-            const printerImageUrl = await uploadImage(
-              auditId,
-              processKey,
-              printerFile,
-              typedPrinterKey,
-            );
+      const uploadedPrinterChecks = await Promise.all(
+        printerEntries.map(async ([printerKey, printerCheck]) => {
+          const printerFiles = options.printerFiles?.[printerKey] ?? null;
+
+          const existingImageUrls = normalizeImageUrls(
+            existingPrinterChecks?.[printerKey]?.imageUrls,
+            existingPrinterChecks?.[printerKey]?.imageUrl,
+          );
+
+          if (printerCheck.status === 'not_updated') {
+            const uploadedImageUrls = printerFiles?.length
+              ? await Promise.all(
+                  printerFiles.map((printerFile) =>
+                    uploadImage(auditId, processKey, printerFile, printerKey),
+                  ),
+                )
+              : [];
+            const mergedImageUrls = [...existingImageUrls, ...uploadedImageUrls];
 
             return [
-              typedPrinterKey,
+              printerKey,
               {
                 ...printerCheck,
-                imageUrl: printerImageUrl,
+                imageUrl: mergedImageUrls[0] ?? null,
+                imageUrls: mergedImageUrls,
               },
             ] as const;
           }
 
-          return [typedPrinterKey, printerCheck] as const;
+          return [
+            printerKey,
+            {
+              ...printerCheck,
+              imageUrl: null,
+              imageUrls: [],
+            },
+          ] as const;
         }),
       );
 
       printerChecks = Object.fromEntries(uploadedPrinterChecks) as PrinterChecks;
     }
+
+    if (printerChecks && !options?.printerFiles) {
+      const printerEntries = Object.entries(printerChecks) as Array<
+        [PrinterCheckKey, PrinterChecks[PrinterCheckKey]]
+      >;
+      const normalizedPrinterChecks = Object.fromEntries(
+        printerEntries.map(([printerKey, printerCheck]) => {
+          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls, printerCheck.imageUrl);
+
+          return [
+            printerKey,
+            {
+              ...printerCheck,
+              imageUrl: normalizedUrls[0] ?? null,
+              imageUrls: normalizedUrls,
+            },
+          ];
+        }),
+      ) as PrinterChecks;
+
+      printerChecks = normalizedPrinterChecks;
+    }
+
+    if (!printerChecks && existingResult?.printerChecks) {
+      const printerEntries = Object.entries(existingResult.printerChecks) as Array<
+        [PrinterCheckKey, PrinterChecks[PrinterCheckKey]]
+      >;
+      const normalizedPrinterChecks = Object.fromEntries(
+        printerEntries.map(([printerKey, printerCheck]) => {
+          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls, printerCheck.imageUrl);
+
+          return [
+            printerKey,
+            {
+              ...printerCheck,
+              imageUrl: normalizedUrls[0] ?? null,
+              imageUrls: normalizedUrls,
+            },
+          ];
+        }),
+      ) as PrinterChecks;
+
+      printerChecks = normalizedPrinterChecks;
+    }
+
+    const normalizedProcessImageUrls = normalizeImageUrls(processImageUrls, null);
 
     // Determine if this process has an issue
     const hasIssue = status === 'not_updated';
@@ -162,14 +269,13 @@ export function createAuditService(config: AuditServiceConfig) {
       hasIssue,
       rating: options?.rating ?? null,
       comment: hasIssue ? comment?.trim() || null : null,
-      imageUrl: hasIssue ? imageUrl : null,
+      imageUrl: hasIssue ? (normalizedProcessImageUrls[0] ?? null) : null,
+      imageUrls: hasIssue ? normalizedProcessImageUrls : [],
       printerChecks,
       issueTargets: options?.issueTargets ?? [],
       createdAt: serverTimestamp(),
     };
 
-    const resultId = `${auditId}_${processKey}`;
-    const resultRef = doc(db, config.resultsCollection, resultId);
     await setDoc(resultRef, resultPayload, { merge: true });
   }
 

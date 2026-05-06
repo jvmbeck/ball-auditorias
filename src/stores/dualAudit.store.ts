@@ -21,7 +21,7 @@ interface ProcessEntry {
 }
 
 type GenericProcessState<TKey extends string> = Record<TKey, ProcessEntry>;
-type GenericProcessFiles<TKey extends string> = Record<TKey, File | null>;
+type GenericProcessFiles<TKey extends string> = Record<TKey, File[]>;
 
 type RtoProcessState = GenericProcessState<RtoAuditProcessKey>;
 type Board5sProcessState = GenericProcessState<Board5sAuditProcessKey>;
@@ -29,7 +29,7 @@ type RtoProcessFiles = GenericProcessFiles<RtoAuditProcessKey>;
 type Board5sProcessFiles = GenericProcessFiles<Board5sAuditProcessKey>;
 
 type PrinterProcessState = Record<PrinterCheckKey, ProcessEntry>;
-type PrinterProcessFiles = Record<PrinterCheckKey, File | null>;
+type PrinterProcessFiles = Record<PrinterCheckKey, File[]>;
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ function buildInitialProcessFiles<TKey extends string>(
   processKeys: TKey[],
 ): GenericProcessFiles<TKey> {
   return processKeys.reduce<GenericProcessFiles<TKey>>((acc, key) => {
-    acc[key] = null;
+    acc[key] = [];
     return acc;
   }, {} as GenericProcessFiles<TKey>);
 }
@@ -91,7 +91,7 @@ function buildInitialPrinterProcessState(): PrinterProcessState {
 
 function buildInitialPrinterProcessFiles(): PrinterProcessFiles {
   return PRINTER_CHECK_KEYS.reduce<PrinterProcessFiles>((acc, key) => {
-    acc[key] = null;
+    acc[key] = [];
     return acc;
   }, {} as PrinterProcessFiles);
 }
@@ -112,7 +112,7 @@ function isProcessReadyForSave<TKey extends string>(
     return true;
   }
 
-  return Boolean(comment.trim()) && Boolean(file);
+  return Boolean(comment.trim()) && file.length > 0;
 }
 
 function isPrinterReadyForSave(
@@ -131,7 +131,7 @@ function isPrinterReadyForSave(
       return true;
     }
 
-    return Boolean(comment.trim()) && Boolean(file);
+    return Boolean(comment.trim()) && file.length > 0;
   });
 }
 
@@ -153,6 +153,7 @@ function buildPrinterChecksPayload(printerState: PrinterProcessState): PrinterCh
       status,
       comment: status === 'not_updated' ? comment.trim() || null : null,
       imageUrl: null,
+      imageUrls: [],
     };
 
     return acc;
@@ -269,17 +270,17 @@ export const useDualAuditStore = defineStore(
 
       RTO_PROCESS_KEYS.forEach((key) => {
         checklistProcessState[key] = { status: null, comment: '' };
-        checklistProcessFiles[key] = null;
+        checklistProcessFiles[key] = [];
       });
 
       PRINTER_CHECK_KEYS.forEach((printerKey) => {
         checklistPrinterState[printerKey] = { status: null, comment: '' };
-        checklistPrinterFiles[printerKey] = null;
+        checklistPrinterFiles[printerKey] = [];
       });
 
       BOARD5S_PROCESS_KEYS.forEach((key) => {
         boardProcessState[key] = { status: null, comment: '' };
-        boardProcessFiles[key] = null;
+        boardProcessFiles[key] = [];
       });
     }
 
@@ -332,17 +333,17 @@ export const useDualAuditStore = defineStore(
       // Reset all process state
       RTO_PROCESS_KEYS.forEach((key) => {
         checklistProcessState[key] = { status: null, comment: '' };
-        checklistProcessFiles[key] = null;
+        checklistProcessFiles[key] = [];
       });
 
       PRINTER_CHECK_KEYS.forEach((printerKey) => {
         checklistPrinterState[printerKey] = { status: null, comment: '' };
-        checklistPrinterFiles[printerKey] = null;
+        checklistPrinterFiles[printerKey] = [];
       });
 
       BOARD5S_PROCESS_KEYS.forEach((key) => {
         boardProcessState[key] = { status: null, comment: '' };
-        boardProcessFiles[key] = null;
+        boardProcessFiles[key] = [];
       });
     }
 
@@ -397,7 +398,7 @@ export const useDualAuditStore = defineStore(
           );
 
           PRINTER_CHECK_KEYS.forEach((printerKey) => {
-            checklistPrinterFiles[printerKey] = null;
+            checklistPrinterFiles[printerKey] = [];
           });
 
           return;
@@ -408,7 +409,7 @@ export const useDualAuditStore = defineStore(
           throw new Error(`Cannot save process "${rtoProcessKey}": status not set.`);
         }
 
-        const file = checklistProcessFiles[rtoProcessKey];
+        const files = checklistProcessFiles[rtoProcessKey];
 
         await checklistAuditService.updateProcess(
           auditId,
@@ -417,10 +418,10 @@ export const useDualAuditStore = defineStore(
           rtoProcessKey,
           status as UpdatableProcessStatus,
           comment || null,
-          file,
+          status === 'not_updated' ? files : null,
         );
 
-        checklistProcessFiles[rtoProcessKey] = null;
+        checklistProcessFiles[rtoProcessKey] = [];
         return;
       }
 
@@ -436,7 +437,7 @@ export const useDualAuditStore = defineStore(
         throw new Error(`Cannot save process "${boardProcessKey}": status not set.`);
       }
 
-      const file = boardProcessFiles[boardProcessKey];
+      const files = boardProcessFiles[boardProcessKey];
 
       await boardAuditService.updateProcess(
         auditId,
@@ -445,10 +446,10 @@ export const useDualAuditStore = defineStore(
         boardProcessKey,
         status as UpdatableProcessStatus,
         comment || null,
-        file,
+        status === 'not_updated' ? files : null,
       );
 
-      boardProcessFiles[boardProcessKey] = null;
+      boardProcessFiles[boardProcessKey] = [];
     }
 
     // ── Actions ───────────────────────────────────────────────────────────
@@ -657,7 +658,7 @@ export const useDualAuditStore = defineStore(
   },
   {
     persist: {
-      key: 'dual-audit-form-draft-v1',
+      key: 'dual-audit-form-draft-v2',
       pick: [
         'checklistAuditId',
         'boardAuditId',

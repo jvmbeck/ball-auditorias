@@ -80,6 +80,7 @@ export interface PrinterCheckResult {
   status: AuditProcessStatus;
   comment?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
 }
 
 export type PrinterChecks = Record<PrinterCheckKey, PrinterCheckResult>;
@@ -88,6 +89,7 @@ export interface AuditProcess {
   status: AuditProcessStatus;
   comment?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   printerChecks?: PrinterChecks | null;
   issueTargets?: PrinterCheckKey[];
 }
@@ -208,6 +210,7 @@ export interface DualTypeAuditResultDocument {
   rating?: Daily5sRatingValue | null;
   comment?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   printerChecks?: PrinterChecks | null;
   issueTargets?: PrinterCheckKey[];
   createdAt: FieldValue;

@@ -27,6 +27,14 @@ function getTodayDateString(): string {
   return `${year}-${month}-${day}`;
 }
 
+function hasProcessImage(process: AuditProcess): boolean {
+  if (Array.isArray(process.imageUrls) && process.imageUrls.length > 0) {
+    return true;
+  }
+
+  return Boolean(process.imageUrl);
+}
+
 /**
  * Creates one analytics document in `auditResults` for each process in the given audit.
  *
@@ -67,7 +75,7 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
       status,
       hasIssue: status === 'not_updated',
       createdAt: serverTimestamp(),
-      hasImage: Boolean(process.imageUrl),
+      hasImage: hasProcessImage(process),
     };
 
     // Document ID encodes both the audit and the process for easy point lookups.

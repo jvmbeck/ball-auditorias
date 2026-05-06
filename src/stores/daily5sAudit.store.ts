@@ -19,7 +19,7 @@ interface Daily5sProcessEntry {
 }
 
 type Daily5sProcessState = Record<Daily5sAuditProcessKey, Daily5sProcessEntry>;
-type Daily5sProcessFiles = Record<Daily5sAuditProcessKey, File | null>;
+type Daily5sProcessFiles = Record<Daily5sAuditProcessKey, File[]>;
 type Daily5sSavedState = Record<Daily5sAuditProcessKey, boolean>;
 
 const DAILY5S_KEYS = DAILY5S_PROCESS_DEFINITIONS.map((process) => process.key);
@@ -49,7 +49,7 @@ function buildInitialProcessState(): Daily5sProcessState {
 
 function buildInitialProcessFiles(): Daily5sProcessFiles {
   return DAILY5S_KEYS.reduce((acc, key) => {
-    acc[key] = null;
+    acc[key] = [];
     return acc;
   }, {} as Daily5sProcessFiles);
 }
@@ -112,14 +112,14 @@ export const useDaily5sAuditStore = defineStore(
           return true;
         }
 
-        return Boolean(comment.trim()) && Boolean(processFiles[key]);
+        return Boolean(comment.trim()) && processFiles[key].length > 0;
       });
     });
 
     function clearProcessStates(): void {
       DAILY5S_KEYS.forEach((key) => {
         processState[key] = { rating: null, comment: '' };
-        processFiles[key] = null;
+        processFiles[key] = [];
         savedProcesses[key] = false;
       });
     }
@@ -189,7 +189,7 @@ export const useDaily5sAuditStore = defineStore(
           rating: result.rating,
           comment: result.comment,
         };
-        processFiles[result.process] = null;
+        processFiles[result.process] = [];
         savedProcesses[result.process] = true;
       });
 
@@ -282,14 +282,14 @@ export const useDaily5sAuditStore = defineStore(
       }
 
       const trimmedComment = comment.trim();
-      const file = processFiles[processKey];
+      const files = processFiles[processKey];
 
       if (rating === 1) {
         if (!trimmedComment) {
           throw new Error('Descricao obrigatoria para nota 1.');
         }
 
-        if (!file) {
+        if (!files.length) {
           throw new Error('Imagem obrigatoria para nota 1.');
         }
       }
@@ -303,11 +303,11 @@ export const useDaily5sAuditStore = defineStore(
         processKey,
         toStatus(rating),
         rating === 1 ? trimmedComment : null,
-        rating === 1 ? file : null,
+        rating === 1 ? files : null,
         { rating },
       );
 
-      processFiles[processKey] = null;
+      processFiles[processKey] = [];
       savedProcesses[processKey] = true;
     }
 
@@ -419,7 +419,7 @@ export const useDaily5sAuditStore = defineStore(
   },
   {
     persist: {
-      key: 'daily-5s-audit-form-draft-v3',
+      key: 'daily-5s-audit-form-draft-v4',
       pick: [
         'auditId',
         'turma',

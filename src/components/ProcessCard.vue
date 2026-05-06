@@ -49,13 +49,14 @@
         />
 
         <q-file
-          :model-value="file"
+          :model-value="files"
           outlined
+          multiple
           clearable
           accept="image/*"
-          label="Envie uma foto como evidência"
+          label="Envie fotos como evidencia"
           bottom-slots
-          @update:model-value="onFileChange"
+          @update:model-value="onFilesChange"
         >
           <template #prepend>
             <q-icon name="photo_camera" />
@@ -89,14 +90,14 @@ const props = defineProps<{
   processKey: string;
   label: string;
   modelValue: ProcessValue;
-  file: File | null;
+  files: File[];
   loading: boolean;
   isSaved: boolean;
 }>();
 
 const emit = defineEmits<{
   'update:modelValue': [value: ProcessValue];
-  'update:file': [file: File | null];
+  'update:files': [files: File[]];
   'update:isSaved': [isSaved: boolean];
   save: [];
 }>();
@@ -104,6 +105,16 @@ const emit = defineEmits<{
 // Reset saved state when modelValue changes
 watch(
   () => props.modelValue,
+  () => {
+    if (props.isSaved) {
+      emit('update:isSaved', false);
+    }
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.files,
   () => {
     if (props.isSaved) {
       emit('update:isSaved', false);
@@ -133,7 +144,7 @@ const isValid = computed(() => {
   if (status === null) return false;
   if (status === 'updated') return true;
 
-  return Boolean(comment.trim()) && Boolean(props.file);
+  return Boolean(comment.trim()) && props.files.length > 0;
 });
 
 function onStatusChange(value: string | null) {
@@ -143,7 +154,7 @@ function onStatusChange(value: string | null) {
     comment: updatedStatus === 'updated' ? '' : props.modelValue.comment,
   });
   if (updatedStatus === 'updated') {
-    emit('update:file', null);
+    emit('update:files', []);
   }
 }
 
@@ -154,8 +165,13 @@ function onCommentChange(value: string | number | null) {
   });
 }
 
-function onFileChange(value: File | null) {
-  emit('update:file', value);
+function onFilesChange(value: File | File[] | null) {
+  if (Array.isArray(value)) {
+    emit('update:files', value);
+    return;
+  }
+
+  emit('update:files', value ? [value] : []);
 }
 </script>
 

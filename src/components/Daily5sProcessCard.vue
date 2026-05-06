@@ -4,15 +4,7 @@
       <div>
         <div class="process-title-row">
           <div class="process-label">{{ label }}</div>
-          <q-btn
-            dense
-            round
-            flat
-            size="sm"
-            icon="info"
-            color="primary"
-            @click="isInfoOpen = true"
-          >
+          <q-btn dense round flat size="sm" icon="info" color="primary" @click="isInfoOpen = true">
             <q-tooltip anchor="top middle" self="bottom middle">Como pontuar esta area</q-tooltip>
           </q-btn>
           <q-icon
@@ -59,13 +51,14 @@
         />
 
         <q-file
-          :model-value="file"
+          :model-value="files"
           outlined
+          multiple
           clearable
           accept="image/*"
-          label="Envie uma foto como evidencia"
+          label="Envie fotos como evidencia"
           bottom-slots
-          @update:model-value="onFileChange"
+          @update:model-value="onFilesChange"
         >
           <template #prepend>
             <q-icon name="photo_camera" />
@@ -85,11 +78,7 @@
       />
     </q-card-section>
 
-    <Daily5sInfoDialog
-      v-model="isInfoOpen"
-      :process-label="label"
-      :guidance="guidance"
-    />
+    <Daily5sInfoDialog v-model="isInfoOpen" :process-label="label" :guidance="guidance" />
   </q-card>
 </template>
 
@@ -107,7 +96,7 @@ const props = defineProps<{
   processKey: string;
   label: string;
   modelValue: ProcessValue;
-  file: File | null;
+  files: File[];
   loading: boolean;
   isSaved: boolean;
   guidance: {
@@ -119,7 +108,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: ProcessValue];
-  'update:file': [file: File | null];
+  'update:files': [files: File[]];
   'update:isSaved': [isSaved: boolean];
   save: [];
 }>();
@@ -128,6 +117,16 @@ const isInfoOpen = ref(false);
 
 watch(
   () => props.modelValue,
+  () => {
+    if (props.isSaved) {
+      emit('update:isSaved', false);
+    }
+  },
+  { deep: true },
+);
+
+watch(
+  () => props.files,
   () => {
     if (props.isSaved) {
       emit('update:isSaved', false);
@@ -169,7 +168,7 @@ const isValid = computed(() => {
     return true;
   }
 
-  return Boolean(comment.trim()) && Boolean(props.file);
+  return Boolean(comment.trim()) && props.files.length > 0;
 });
 
 function onRatingChange(value: Daily5sRatingValue | null) {
@@ -179,7 +178,7 @@ function onRatingChange(value: Daily5sRatingValue | null) {
   });
 
   if (value !== 1) {
-    emit('update:file', null);
+    emit('update:files', []);
   }
 }
 
@@ -190,8 +189,13 @@ function onCommentChange(value: string | number | null) {
   });
 }
 
-function onFileChange(value: File | null) {
-  emit('update:file', value);
+function onFilesChange(value: File | File[] | null) {
+  if (Array.isArray(value)) {
+    emit('update:files', value);
+    return;
+  }
+
+  emit('update:files', value ? [value] : []);
 }
 </script>
 

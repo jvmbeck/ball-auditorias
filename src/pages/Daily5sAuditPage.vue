@@ -95,11 +95,11 @@
             :label="process.label"
             :guidance="process.guidance"
             :model-value="processState[process.key]"
-            :file="processFiles[process.key]"
+            :files="processFiles[process.key]"
             :is-saved="savedProcesses[process.key]"
             :loading="loading"
             @update:model-value="processState[process.key] = $event"
-            @update:file="processFiles[process.key] = $event"
+            @update:files="processFiles[process.key] = $event"
             @update:is-saved="savedProcesses[process.key] = $event"
             @save="saveCurrentProcess(process.key)"
           />

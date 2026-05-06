@@ -45,20 +45,21 @@
                 {{ getProcessStatusLabel(getProcessResult(process.key)) }}
               </q-chip>
 
-              <q-btn
-                v-if="getProcessResult(process.key)?.imageUrl"
-                dense
-                outline
-                icon="download"
-                label="Baixar Imagem"
-                :loading="downloadingKey === process.key"
-                @click="
-                  downloadProcessImage(
-                    process.key,
-                    getProcessResult(process.key)!.imageUrl as string,
-                  )
-                "
-              />
+              <div
+                v-if="getProcessImageUrls(process.key).length"
+                class="download-actions column q-gutter-xs"
+              >
+                <q-btn
+                  v-for="(imageUrl, imageIndex) in getProcessImageUrls(process.key)"
+                  :key="`${process.key}-${imageIndex}`"
+                  dense
+                  outline
+                  icon="download"
+                  :label="`Baixar Imagem ${imageIndex + 1}`"
+                  :loading="downloadingKey === `${process.key}-${imageIndex}`"
+                  @click="downloadProcessImage(process.key, imageUrl, imageIndex + 1)"
+                />
+              </div>
             </q-item-section>
           </q-item>
         </q-list>
@@ -71,11 +72,7 @@
 import { computed, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { formatAuditDate, formatDayOfWeek } from 'src/utils/dateFormatting';
-import type {
-  AuditType,
-  DualAuditProcessKey,
-  DualTypeAuditResultDocument,
-} from 'src/types/audit';
+import type { AuditType, DualAuditProcessKey, DualTypeAuditResultDocument } from 'src/types/audit';
 
 type HistoryAuditItem = {
   id: string;
@@ -111,6 +108,30 @@ const downloadingKey = ref<string | null>(null);
 
 function getProcessResult(key: string): DualTypeAuditResultDocument | undefined {
   return props.audit?.processes[key as DualAuditProcessKey];
+}
+
+function getProcessImageUrls(processKey: string): string[] {
+  const result = getProcessResult(processKey);
+
+  if (!result) {
+    return [];
+  }
+
+  const urls = new Set<string>();
+
+  if (Array.isArray(result.imageUrls)) {
+    result.imageUrls.forEach((url) => {
+      if (typeof url === 'string' && url.length > 0) {
+        urls.add(url);
+      }
+    });
+  }
+
+  if (typeof result.imageUrl === 'string' && result.imageUrl.length > 0) {
+    urls.add(result.imageUrl);
+  }
+
+  return [...urls];
 }
 
 const isOpen = computed({
@@ -239,8 +260,8 @@ async function copyAuditSummary() {
   }
 }
 
-async function downloadProcessImage(processKey: string, imageUrl: string) {
-  downloadingKey.value = processKey;
+async function downloadProcessImage(processKey: string, imageUrl: string, imageNumber: number) {
+  downloadingKey.value = `${processKey}-${imageNumber - 1}`;
 
   try {
     const response = await fetch(imageUrl);
@@ -254,7 +275,7 @@ async function downloadProcessImage(processKey: string, imageUrl: string) {
     const link = document.createElement('a');
 
     link.href = objectUrl;
-    link.download = `${props.audit?.id ?? 'audit'}-${processKey}.jpg`;
+    link.download = `${props.audit?.id ?? 'audit'}-${processKey}-${imageNumber}.jpg`;
     link.click();
 
     URL.revokeObjectURL(objectUrl);
@@ -288,5 +309,9 @@ async function downloadProcessImage(processKey: string, imageUrl: string) {
 
 .metadata {
   color: #5f7077;
+}
+
+.download-actions {
+  min-width: 170px;
 }
 </style>

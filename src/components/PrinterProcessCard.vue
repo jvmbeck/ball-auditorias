@@ -68,9 +68,10 @@
           <q-file
             :model-value="files[printer.key]"
             outlined
+            multiple
             clearable
             accept="image/*"
-            label="Envie uma foto como evidencia"
+            label="Envie fotos como evidencia"
             bottom-slots
             @update:model-value="onFileChange(printer.key, $event)"
           >
@@ -105,7 +106,7 @@ interface PrinterCheckValue {
 }
 
 type PrinterChecksValue = Record<PrinterCheckKey, PrinterCheckValue>;
-type PrinterFilesValue = Record<PrinterCheckKey, File | null>;
+type PrinterFilesValue = Record<PrinterCheckKey, File[]>;
 
 const props = defineProps<{
   label: string;
@@ -179,7 +180,7 @@ const isValid = computed(() =>
     if (check.status === null) return false;
     if (check.status === 'updated') return true;
 
-    return Boolean(check.comment.trim()) && Boolean(file);
+    return Boolean(check.comment.trim()) && file.length > 0;
   }),
 );
 
@@ -211,7 +212,7 @@ function onStatusChange(printerKey: PrinterCheckKey, value: string | null) {
   if (updatedStatus === 'updated') {
     emit('update:files', {
       ...props.files,
-      [printerKey]: null,
+      [printerKey]: [],
     });
   }
 }
@@ -226,10 +227,12 @@ function onCommentChange(printerKey: PrinterCheckKey, value: string | number | n
   });
 }
 
-function onFileChange(printerKey: PrinterCheckKey, value: File | null) {
+function onFileChange(printerKey: PrinterCheckKey, value: File | File[] | null) {
+  const normalizedFiles = Array.isArray(value) ? value : value ? [value] : [];
+
   emit('update:files', {
     ...props.files,
-    [printerKey]: value,
+    [printerKey]: normalizedFiles,
   });
 }
 </script>

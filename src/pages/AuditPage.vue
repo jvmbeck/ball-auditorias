@@ -140,7 +140,7 @@
                 ? checklistProcessState[process.key as RtoAuditProcessKey]
                 : boardProcessState[process.key as Board5sAuditProcessKey]
             "
-            :file="
+            :files="
               selectedAuditType === 'rto'
                 ? checklistProcessFiles[process.key as RtoAuditProcessKey]
                 : boardProcessFiles[process.key as Board5sAuditProcessKey]
@@ -156,7 +156,7 @@
                 ? (checklistProcessState[process.key as RtoAuditProcessKey] = $event)
                 : (boardProcessState[process.key as Board5sAuditProcessKey] = $event)
             "
-            @update:file="
+            @update:files="
               selectedAuditType === 'rto'
                 ? (checklistProcessFiles[process.key as RtoAuditProcessKey] = $event)
                 : (boardProcessFiles[process.key as Board5sAuditProcessKey] = $event)
@@ -305,7 +305,7 @@ function isRtoProcessValid(processKey: RtoAuditProcessKey): boolean {
       if (status === null) return false;
       if (status === 'updated') return true;
 
-      return Boolean(comment.trim()) && Boolean(file);
+      return Boolean(comment.trim()) && file.length > 0;
     });
   }
 
@@ -314,7 +314,7 @@ function isRtoProcessValid(processKey: RtoAuditProcessKey): boolean {
   if (status === null) return false;
   if (status === 'updated') return true;
 
-  return Boolean(comment.trim()) && Boolean(file);
+  return Boolean(comment.trim()) && file.length > 0;
 }
 
 function isBoard5sProcessValid(processKey: Board5sAuditProcessKey): boolean {

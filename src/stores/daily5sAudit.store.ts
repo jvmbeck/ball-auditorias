@@ -178,13 +178,10 @@ export const useDaily5sAuditStore = defineStore(
 
     async function hydrateSavedProcesses(existingAuditId: string): Promise<void> {
       const persisted = await getDaily5sResultsForAudit(existingAuditId);
-      const selected = new Set<Daily5sAuditProcessKey>();
 
       clearProcessStates();
 
       persisted.forEach((result) => {
-        selected.add(result.process);
-
         processState[result.process] = {
           rating: result.rating,
           comment: result.comment,
@@ -193,7 +190,8 @@ export const useDaily5sAuditStore = defineStore(
         savedProcesses[result.process] = true;
       });
 
-      selectedProcessKeys.value = [...selected];
+      // Do not restore selectedProcessKeys — the page always starts fresh.
+      // Already-rated processes are visible in the Daily5sRatedProcessesCard.
     }
 
     async function initialize(): Promise<void> {

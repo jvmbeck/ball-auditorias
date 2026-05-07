@@ -1,8 +1,8 @@
 {
-  "name": "auth-boilerplate",
+  "name": "ball-auditorias",
   "version": "0.0.1",
-  "description": "Código Boilerplate para autenticação do Firebase",
-  "productName": "Auth Boilerplate",
+  "description": "Sistema de auditorias para processos industriais, com foco em checklists 5s e RTO (Relatório de Turno Operacional).",
+  "productName": "Ball Auditorias",
   "author": "jvmbeck <jmadridbeck@gmail.com>",
   "type": "module",
   "private": true,

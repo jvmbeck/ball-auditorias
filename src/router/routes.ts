@@ -4,7 +4,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/IndexPage.vue') }],
+    children: [{ path: '', name: 'index', component: () => import('pages/IndexPage.vue') }],
     meta: { requiresAuth: true },
   },
   {
@@ -12,8 +12,8 @@ const routes: RouteRecordRaw[] = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       {
-        path: '',
-        name: 'audit-page',
+        path: 'rto-board5s',
+        name: 'rto-board5s-page',
         component: () => import('pages/AuditPage.vue'),
       },
       {
@@ -21,26 +21,23 @@ const routes: RouteRecordRaw[] = [
         name: 'daily5s-audit-page',
         component: () => import('pages/Daily5sAuditPage.vue'),
       },
-    ],
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/audits/history',
-    component: () => import('layouts/MainLayout.vue'),
-    children: [
       {
-        path: '',
+        path: 'daily-5s-heatmap',
+        name: 'daily5s-heatmap-page',
+        component: () => import('pages/Daily5sHeatmapPage.vue'),
+      },
+      {
+        path: 'audit-history',
         name: 'audit-history',
         component: () => import('pages/AuditHistoryPage.vue'),
       },
     ],
     meta: { requiresAuth: true },
   },
-
   {
     path: '/login',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', component: () => import('pages/LoginPage.vue') }],
+    children: [{ path: '', name: 'login', component: () => import('pages/LoginPage.vue') }],
     meta: { guestOnly: true },
   },
 

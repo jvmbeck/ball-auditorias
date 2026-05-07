@@ -6,7 +6,7 @@
         <div class="content-stack">
           <div class="resume-header">
             <q-icon name="fact_check" size="28px" color="positive" class="q-mr-sm" />
-            <span class="resume-title" style="color: var(--q-positive)">Checklist e Quadros</span>
+            <span class="resume-title" style="color: var(--q-positive)">RTO e Quadros 5s</span>
           </div>
 
           <div class="progress-row">
@@ -35,7 +35,7 @@
         <div class="content-stack">
           <div class="resume-header">
             <q-icon name="fact_check" size="28px" color="primary" class="q-mr-sm" />
-            <span class="resume-title">Checklists e Quadros</span>
+            <span class="resume-title">RTO e Quadros 5s</span>
           </div>
 
           <div class="progress-row">
@@ -53,7 +53,7 @@
           icon-right="arrow_forward"
           label="Continuar Auditoria"
           size="md"
-          to="/audits"
+          :to="{ name: 'rto-board5s-page' }"
           class="full-width cta-btn"
         />
       </template>
@@ -63,7 +63,7 @@
         <div class="content-stack">
           <div class="start-header">
             <q-icon name="fact_check" size="28px" color="positive" class="q-mr-sm" />
-            <span class="start-title">Checklists e Quadros</span>
+            <span class="start-title">RTO e Quadros 5s</span>
           </div>
 
           <p class="start-hint">
@@ -81,7 +81,7 @@
           icon-right="arrow_forward"
           label="Iniciar Auditoria"
           size="md"
-          to="/audits"
+          :to="{ name: 'rto-board5s-page' }"
           class="full-width cta-btn"
         />
       </template>

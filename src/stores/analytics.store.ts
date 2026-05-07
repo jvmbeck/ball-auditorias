@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
+  fetchDaily5sMonthlyHeatmap,
   fetchFailuresByDateAndProcess,
   fetchFailuresByProcess,
   fetchFailuresByProcessAndTurma,
@@ -14,6 +15,7 @@ import type {
   FailuresOverTimeData,
   ProcessFailureRatesData,
   AuditType,
+  Daily5sMonthlyHeatmapData,
 } from 'src/types/audit';
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
@@ -49,6 +51,13 @@ const EMPTY_FAILURES_BY_DATE_AND_PROCESS: FailuresByDateAndProcessData = {
   series: [],
 };
 
+const EMPTY_DAILY5S_MONTHLY_HEATMAP: Daily5sMonthlyHeatmapData = {
+  monthKey: '',
+  processLabels: [],
+  xAxisCategories: [],
+  points: [],
+};
+
 function isStale(lastFetchedAt: number | null): boolean {
   if (!lastFetchedAt) {
     return true;
@@ -71,18 +80,21 @@ export const useAnalyticsStore = defineStore(
     const failuresByDateAndProcess = ref<FailuresByDateAndProcessData>(
       EMPTY_FAILURES_BY_DATE_AND_PROCESS,
     );
+    const daily5sMonthlyHeatmap = ref<Daily5sMonthlyHeatmapData>(EMPTY_DAILY5S_MONTHLY_HEATMAP);
 
     const overTimeLoading = ref(false);
     const byProcessLoading = ref(false);
     const processFailureRateLoading = ref(false);
     const byProcessAndTurmaLoading = ref(false);
     const byDateAndProcessLoading = ref(false);
+    const daily5sMonthlyHeatmapLoading = ref(false);
 
     const overTimeError = ref<string | null>(null);
     const byProcessError = ref<string | null>(null);
     const processFailureRateError = ref<string | null>(null);
     const byProcessAndTurmaError = ref<string | null>(null);
     const byDateAndProcessError = ref<string | null>(null);
+    const daily5sMonthlyHeatmapError = ref<string | null>(null);
 
     const overTimeLastFetchedAt = ref<number | null>(null);
     const byProcessLastFetchedAt = ref<number | null>(null);
@@ -91,6 +103,8 @@ export const useAnalyticsStore = defineStore(
     const byProcessAndTurmaDays = ref(30);
     const byDateAndProcessLastFetchedAt = ref<number | null>(null);
     const byDateAndProcessDays = ref(30);
+    const daily5sMonthlyHeatmapLastFetchedAt = ref<number | null>(null);
+    const daily5sMonthlyHeatmapMonth = ref<string | null>(null);
 
     // ── Dual-type state ───────────────────────────────────────────────────────
 
@@ -118,6 +132,7 @@ export const useAnalyticsStore = defineStore(
     let processFailureRateRequest: Promise<void> | null = null;
     let byProcessAndTurmaRequest: Promise<void> | null = null;
     let byDateAndProcessRequest: Promise<void> | null = null;
+    let daily5sMonthlyHeatmapRequest: Promise<void> | null = null;
 
     let checklistOverTimeRequest: Promise<void> | null = null;
     let boardOverTimeRequest: Promise<void> | null = null;
@@ -442,6 +457,47 @@ export const useAnalyticsStore = defineStore(
       ]);
     }
 
+    async function loadDaily5sMonthlyHeatmap(monthKey: string, force = false): Promise<void> {
+      const hasCachedData = daily5sMonthlyHeatmap.value.processLabels.length > 0;
+
+      if (
+        !force &&
+        hasCachedData &&
+        daily5sMonthlyHeatmapMonth.value === monthKey &&
+        !isStale(daily5sMonthlyHeatmapLastFetchedAt.value)
+      ) {
+        return;
+      }
+
+      if (daily5sMonthlyHeatmapRequest) {
+        return daily5sMonthlyHeatmapRequest;
+      }
+
+      daily5sMonthlyHeatmapRequest = (async () => {
+        daily5sMonthlyHeatmapLoading.value = true;
+        daily5sMonthlyHeatmapError.value = null;
+
+        try {
+          daily5sMonthlyHeatmap.value = await fetchDaily5sMonthlyHeatmap(monthKey);
+          daily5sMonthlyHeatmapMonth.value = daily5sMonthlyHeatmap.value.monthKey;
+          daily5sMonthlyHeatmapLastFetchedAt.value = Date.now();
+        } catch (err: unknown) {
+          daily5sMonthlyHeatmapError.value =
+            err instanceof Error ? err.message : 'Unable to load Daily 5S monthly heatmap.';
+          throw err;
+        } finally {
+          daily5sMonthlyHeatmapLoading.value = false;
+          daily5sMonthlyHeatmapRequest = null;
+        }
+      })();
+
+      return daily5sMonthlyHeatmapRequest;
+    }
+
+    async function refreshDaily5sMonthlyHeatmap(monthKey: string): Promise<void> {
+      await loadDaily5sMonthlyHeatmap(monthKey, true);
+    }
+
     return {
       // Legacy
       failuresOverTime,
@@ -449,16 +505,19 @@ export const useAnalyticsStore = defineStore(
       processFailureRates,
       failuresByProcessAndTurma,
       failuresByDateAndProcess,
+      daily5sMonthlyHeatmap,
       overTimeLoading,
       byProcessLoading,
       processFailureRateLoading,
       byProcessAndTurmaLoading,
       byDateAndProcessLoading,
+      daily5sMonthlyHeatmapLoading,
       overTimeError,
       byProcessError,
       processFailureRateError,
       byProcessAndTurmaError,
       byDateAndProcessError,
+      daily5sMonthlyHeatmapError,
       overTimeLastFetchedAt,
       byProcessLastFetchedAt,
       processFailureRateLastFetchedAt,
@@ -466,12 +525,16 @@ export const useAnalyticsStore = defineStore(
       byProcessAndTurmaDays,
       byDateAndProcessLastFetchedAt,
       byDateAndProcessDays,
+      daily5sMonthlyHeatmapLastFetchedAt,
+      daily5sMonthlyHeatmapMonth,
       loadFailuresOverTime,
       loadFailuresByProcess,
       loadProcessFailureRates,
       loadFailuresByProcessAndTurma,
       loadFailuresByDateAndProcess,
       refreshAllAnalytics,
+      loadDaily5sMonthlyHeatmap,
+      refreshDaily5sMonthlyHeatmap,
       // Dual-type
       checklistFailuresOverTime,
       boardFailuresOverTime,
@@ -508,6 +571,9 @@ export const useAnalyticsStore = defineStore(
         'byProcessAndTurmaDays',
         'byDateAndProcessLastFetchedAt',
         'byDateAndProcessDays',
+        'daily5sMonthlyHeatmap',
+        'daily5sMonthlyHeatmapLastFetchedAt',
+        'daily5sMonthlyHeatmapMonth',
         // Dual-type
         'checklistFailuresOverTime',
         'boardFailuresOverTime',

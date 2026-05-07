@@ -22,7 +22,7 @@
       <!-- Auditoria Diária tab -->
       <div v-show="activeTab === 'dailyAudit'">
         <section class="q-mb-xl">
-          <DailyAuditCard />
+          <RtoBoard5sCard />
         </section>
 
         <section class="analytics-section">
@@ -83,15 +83,67 @@
           </div>
         </section>
 
-        <!-- Placeholder: 5S-specific analytics will be added in a later phase -->
         <section class="analytics-section">
           <div class="analytics-header q-mb-md">
             <div>
               <p class="eyebrow">Análises</p>
               <h2 class="section-title">Insights 5S</h2>
               <p class="subtitle">
-                Análises específicas do Checklist 5S serão exibidas aqui em uma próxima fase.
+                Acompanhe a pontuação diária da turma ativa como percentual sobre 185 pontos.
               </p>
+            </div>
+
+            <div class="analytics-controls">
+              <q-btn
+                outline
+                color="primary"
+                icon="grid_view"
+                label="Mapa Mensal"
+                @click="goToDaily5sHeatmap"
+              />
+
+              <q-btn
+                outline
+                color="primary"
+                icon="refresh"
+                label="Atualizar"
+                @click="handleRefreshDaily5sAnalytics"
+                class="q-mr-md"
+              />
+
+              <q-select
+                v-model="daily5sSelectedTurma"
+                outlined
+                dense
+                emit-value
+                map-options
+                :options="turmaOptions"
+                label="Turma"
+                class="days-select"
+              />
+
+              <q-select
+                v-model="daily5sSelectedDays"
+                outlined
+                dense
+                :options="daysOptions"
+                option-value="value"
+                option-label="label"
+                emit-value
+                map-options
+                label="Selecione o período"
+                class="days-select"
+              />
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-item">
+              <Daily5sScoreProgressCard
+                :turma="daily5sSelectedTurma"
+                :days="daily5sSelectedDays"
+                :refresh-token="daily5sAnalyticsRefreshToken"
+              />
             </div>
           </div>
         </section>
@@ -103,19 +155,25 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
+import { useRouter } from 'vue-router';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
-import DailyAuditCard from 'src/components/DailyAuditCard.vue';
+import Daily5sScoreProgressCard from 'src/components/Daily5sScoreProgressCard.vue';
+import RtoBoard5sCard from 'src/components/rtoBoard5sCard.vue';
 import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
 import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();
+const router = useRouter();
 const analyticsStore = useAnalyticsStore();
 
 const activeTab = ref<'dailyAudit' | 'checklist5s'>('dailyAudit');
 const refreshingAnalytics = ref(false);
 const selectedDays = ref<number>(30);
+const daily5sSelectedDays = ref<number>(30);
+const daily5sSelectedTurma = ref<'A e C' | 'B e D'>('B e D');
+const daily5sAnalyticsRefreshToken = ref(0);
 
 const daysOptions = [
   { label: 'Últimos 7 dias', value: 7 },
@@ -123,6 +181,11 @@ const daysOptions = [
   { label: 'Últimos 30 dias', value: 30 },
   { label: 'Últimos 60 dias', value: 60 },
   { label: 'Últimos 90 dias', value: 90 },
+];
+
+const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
+  { label: 'Turma A e C', value: 'A e C' },
+  { label: 'Turma B e D', value: 'B e D' },
 ];
 
 async function handleRefreshAnalytics() {
@@ -142,6 +205,14 @@ async function handleRefreshAnalytics() {
   } finally {
     refreshingAnalytics.value = false;
   }
+}
+
+function handleRefreshDaily5sAnalytics() {
+  daily5sAnalyticsRefreshToken.value += 1;
+}
+
+function goToDaily5sHeatmap(): void {
+  void router.push({ name: 'daily5s-heatmap-page' });
 }
 </script>
 

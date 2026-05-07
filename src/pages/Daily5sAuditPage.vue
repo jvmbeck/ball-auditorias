@@ -237,6 +237,7 @@ async function finishAudit() {
 
   try {
     await daily5sStore.finishAudit();
+    ratedProcessesRefreshToken.value += 1;
     $q.notify({ type: 'positive', message: 'Auditoria Daily 5S concluida com sucesso.' });
     await router.push({ name: 'audit-history' });
   } catch (err: unknown) {

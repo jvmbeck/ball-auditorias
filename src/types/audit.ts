@@ -166,6 +166,26 @@ export interface Daily5sScoreTrendData {
   totalsByDate: Record<string, number>;
 }
 
+export type Daily5sTurma = 'A e C' | 'B e D';
+
+export type Daily5sHeatmapValue = Daily5sRatingValue | 0;
+
+export interface Daily5sHeatmapCategory {
+  key: string;
+  date: string;
+  turma: Daily5sTurma;
+  label: string;
+}
+
+export type Daily5sHeatmapPoint = [number, number, Daily5sHeatmapValue];
+
+export interface Daily5sMonthlyHeatmapData {
+  monthKey: string;
+  processLabels: string[];
+  xAxisCategories: Daily5sHeatmapCategory[];
+  points: Daily5sHeatmapPoint[];
+}
+
 /** Write-side shape for a single analytics record in a process-results collection. */
 export interface rtoAuditResultDocument {
   auditId: string;

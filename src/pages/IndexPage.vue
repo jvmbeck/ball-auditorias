@@ -22,7 +22,7 @@
       <!-- Auditoria Diária tab -->
       <div v-show="activeTab === 'dailyAudit'">
         <section class="q-mb-xl">
-          <DailyAuditCard />
+          <RtoBoard5sCard />
         </section>
 
         <section class="analytics-section">
@@ -97,6 +97,14 @@
               <q-btn
                 outline
                 color="primary"
+                icon="grid_view"
+                label="Mapa Mensal"
+                @click="goToDaily5sHeatmap"
+              />
+
+              <q-btn
+                outline
+                color="primary"
                 icon="refresh"
                 label="Atualizar"
                 @click="handleRefreshDaily5sAnalytics"
@@ -147,15 +155,17 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
+import { useRouter } from 'vue-router';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
 import Daily5sScoreProgressCard from 'src/components/Daily5sScoreProgressCard.vue';
-import DailyAuditCard from 'src/components/DailyAuditCard.vue';
+import RtoBoard5sCard from 'src/components/rtoBoard5sCard.vue';
 import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
 import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();
+const router = useRouter();
 const analyticsStore = useAnalyticsStore();
 
 const activeTab = ref<'dailyAudit' | 'checklist5s'>('dailyAudit');
@@ -199,6 +209,10 @@ async function handleRefreshAnalytics() {
 
 function handleRefreshDaily5sAnalytics() {
   daily5sAnalyticsRefreshToken.value += 1;
+}
+
+function goToDaily5sHeatmap(): void {
+  void router.push({ name: 'daily5s-heatmap-page' });
 }
 </script>
 

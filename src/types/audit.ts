@@ -158,6 +158,14 @@ export interface FailuresByDateAndProcessData {
   series: FailuresByDateAndProcessSeries[];
 }
 
+export interface Daily5sScoreTrendData {
+  labels: string[];
+  percentages: number[];
+  totals: number[];
+  percentagesByDate: Record<string, number>;
+  totalsByDate: Record<string, number>;
+}
+
 /** Write-side shape for a single analytics record in a process-results collection. */
 export interface rtoAuditResultDocument {
   auditId: string;

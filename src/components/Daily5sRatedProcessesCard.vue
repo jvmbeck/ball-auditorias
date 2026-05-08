@@ -5,7 +5,7 @@
         <q-icon name="fact_check" size="24px" color="primary" class="q-mr-sm" />
         <div>
           <div class="title">Processos Avaliados Hoje</div>
-          <div class="subtitle">Lista de processos ja registrados no Daily 5S.</div>
+          <div class="subtitle">Lista de processos já registrados na auditoria diária de 5S.</div>
         </div>
       </div>
 

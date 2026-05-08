@@ -15,8 +15,8 @@
         active-color="primary"
         indicator-color="primary"
       >
-        <q-tab name="dailyAudit" label="Auditoria Diária" />
-        <q-tab name="checklist5s" label="Checklist 5S" />
+        <q-tab name="dailyAudit" label="RTO e Quadros 5S" />
+        <q-tab name="checklist5s" label="Auditoria Diária de 5S" />
       </q-tabs>
 
       <!-- Auditoria Diária tab -->
@@ -37,6 +37,14 @@
             </div>
 
             <div class="analytics-controls">
+              <q-btn
+                outline
+                color="primary"
+                icon="history"
+                label="Histórico de auditoria"
+                @click="goToAuditHistory"
+                class="q-mr-md"
+              />
               <q-btn
                 outline
                 color="primary"
@@ -213,6 +221,10 @@ function handleRefreshDaily5sAnalytics() {
 
 function goToDaily5sHeatmap(): void {
   void router.push({ name: 'daily5s-heatmap-page' });
+}
+
+function goToAuditHistory(): void {
+  void router.push({ name: 'audit-history' });
 }
 </script>
 

@@ -3,11 +3,11 @@
     <q-card-section>
       <div class="header q-mb-md">
         <q-icon name="task_alt" size="28px" color="secondary" class="q-mr-sm" />
-        <span class="title">Daily 5S</span>
+        <span class="title">Auditoria diária de 5S</span>
       </div>
 
       <p class="description q-mb-md">
-        Selecione os processos que deseja avaliar hoje e aplique notas 1, 3 ou 5 para cada area.
+        Selecione os processos que deseja avaliar hoje e aplique notas 1, 3 ou 5 para cada área.
       </p>
 
       <div class="status-row q-mb-md">
@@ -18,7 +18,7 @@
           text-color="white"
           icon="task_alt"
         >
-          Concluida hoje
+          Concluída hoje
         </q-chip>
         <q-chip
           v-else-if="todaysStatus"
@@ -30,7 +30,7 @@
           Em andamento
         </q-chip>
         <q-chip v-else dense color="grey-3" text-color="grey-8" icon="schedule">
-          Nao iniciada hoje
+          Não iniciada hoje
         </q-chip>
       </div>
 

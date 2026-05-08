@@ -4,14 +4,14 @@
       <div class="header q-mb-sm">
         <q-icon name="show_chart" size="24px" color="primary" class="q-mr-sm" />
         <div>
-          <div class="title">Pontuacao Daily 5S (%)</div>
+          <div class="title">Pontuação auditoria diária de 5S (%)</div>
           <div class="subtitle">{{ turmaSubtitle }}</div>
         </div>
       </div>
 
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="24px" />
-        <span>Carregando pontuacoes...</span>
+        <span>Carregando pontuações...</span>
       </div>
 
       <div v-else-if="error" class="state-box">
@@ -21,7 +21,7 @@
 
       <div v-else-if="!props.turma" class="state-box">
         <q-icon name="groups" size="20px" color="grey-7" />
-        <span>Selecione a turma para visualizar o grafico.</span>
+        <span>Selecione a turma para visualizar o gráfico.</span>
       </div>
 
       <div v-else>
@@ -29,7 +29,7 @@
           <q-chip color="primary" text-color="white" icon="query_stats">
             {{ latestPercentage }}% ({{ latestTotal }}/{{ DAILY5S_MAX_SCORE }})
           </q-chip>
-          <span class="kpi-hint">Resultado do dia mais recente no periodo.</span>
+          <span class="kpi-hint">Resultado do dia mais recente no período.</span>
         </div>
 
         <VChart autoresize :option="chartOption" class="chart" />
@@ -81,7 +81,7 @@ const turmaSubtitle = computed(() => {
     return 'Uma turma por vez (a turma ativa do dia)';
   }
 
-  return `Turma ${props.turma} - percentual da pontuacao diaria sobre ${DAILY5S_MAX_SCORE}`;
+  return `Turma ${props.turma} - percentual da pontuação diária sobre ${DAILY5S_MAX_SCORE}`;
 });
 
 const latestTotal = computed(() => {

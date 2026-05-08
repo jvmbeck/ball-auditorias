@@ -40,7 +40,7 @@
       </q-menu>
     </q-btn>
     <div>
-      <div class="avatar-title text-h6">{{ authStore.profile?.name }}</div>
+      <div class="avatar-title text-h6 q-mt-xs q-ml-md">{{ authStore.profile?.name }}</div>
     </div>
   </div>
 </template>
@@ -71,5 +71,12 @@ async function logout() {
   margin-top: 8px;
   font-weight: bold;
   text-align: center;
+}
+
+@media (max-width: 798px) {
+  q-avatar {
+    width: 40px;
+    height: 40px;
+  }
 }
 </style>

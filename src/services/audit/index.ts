@@ -4,7 +4,6 @@ export * from './history';
 export * from './analytics.failuresOverTime';
 export * from './analytics.failuresByProcess';
 export * from './analytics.failuresByProcessAndTurma';
-export * from './analytics.failuresByDateAndProcess';
 export * from './analytics.processFailureRate';
 export * from './analytics.daily5sScores';
 export * from './analytics.daily5sHeatmap';

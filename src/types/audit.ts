@@ -148,16 +148,6 @@ export interface FailuresByProcessAndTurmaData {
   seriesBD: number[];
 }
 
-export interface FailuresByDateAndProcessSeries {
-  name: string;
-  data: number[];
-}
-
-export interface FailuresByDateAndProcessData {
-  labels: string[];
-  series: FailuresByDateAndProcessSeries[];
-}
-
 export interface Daily5sScoreTrendData {
   labels: string[];
   percentages: number[];

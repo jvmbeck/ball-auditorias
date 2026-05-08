@@ -65,10 +65,10 @@
           <!-- Responsive charts grid -->
           <div class="charts-grid">
             <div class="chart-item">
-              <FailuresByProcessAndTurmaCard :days="selectedDays" />
+              <RtoFailuresByProcessAndTurmaCard :days="selectedDays" />
             </div>
             <div class="chart-item">
-              <FailuresByDateAndProcessCard :days="selectedDays" />
+              <Board5sFailuresByProcessAndTurmaCard :days="selectedDays" />
             </div>
           </div>
         </section>
@@ -160,8 +160,8 @@ import Checklist5SCard from 'src/components/Checklist5SCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
 import Daily5sScoreProgressCard from 'src/components/Daily5sScoreProgressCard.vue';
 import RtoBoard5sCard from 'src/components/rtoBoard5sCard.vue';
-import FailuresByDateAndProcessCard from 'src/components/FailuresByDateAndProcessCard.vue';
-import FailuresByProcessAndTurmaCard from 'src/components/FailuresByProcessAndTurmaCard.vue';
+import RtoFailuresByProcessAndTurmaCard from 'src/components/RtoFailuresByProcessAndTurmaCard.vue';
+import Board5sFailuresByProcessAndTurmaCard from 'src/components/Board5sFailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();

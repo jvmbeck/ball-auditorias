@@ -2,14 +2,12 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
   fetchDaily5sMonthlyHeatmap,
-  fetchFailuresByDateAndProcess,
   fetchFailuresByProcess,
   fetchFailuresByProcessAndTurma,
   fetchFailuresOverTime,
   fetchProcessFailureRates,
 } from 'src/services/audit';
 import type {
-  FailuresByDateAndProcessData,
   FailuresByProcessAndTurmaData,
   FailuresByProcessData,
   FailuresOverTimeData,
@@ -46,11 +44,6 @@ const EMPTY_FAILURES_BY_PROCESS_AND_TURMA: FailuresByProcessAndTurmaData = {
   seriesBD: [],
 };
 
-const EMPTY_FAILURES_BY_DATE_AND_PROCESS: FailuresByDateAndProcessData = {
-  labels: [],
-  series: [],
-};
-
 const EMPTY_DAILY5S_MONTHLY_HEATMAP: Daily5sMonthlyHeatmapData = {
   monthKey: '',
   processLabels: [],
@@ -74,35 +67,21 @@ export const useAnalyticsStore = defineStore(
     const failuresOverTime = ref<FailuresOverTimeData>(EMPTY_FAILURES_OVER_TIME);
     const failuresByProcess = ref<FailuresByProcessData>(EMPTY_FAILURES_BY_PROCESS);
     const processFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
-    const failuresByProcessAndTurma = ref<FailuresByProcessAndTurmaData>(
-      EMPTY_FAILURES_BY_PROCESS_AND_TURMA,
-    );
-    const failuresByDateAndProcess = ref<FailuresByDateAndProcessData>(
-      EMPTY_FAILURES_BY_DATE_AND_PROCESS,
-    );
     const daily5sMonthlyHeatmap = ref<Daily5sMonthlyHeatmapData>(EMPTY_DAILY5S_MONTHLY_HEATMAP);
 
     const overTimeLoading = ref(false);
     const byProcessLoading = ref(false);
     const processFailureRateLoading = ref(false);
-    const byProcessAndTurmaLoading = ref(false);
-    const byDateAndProcessLoading = ref(false);
     const daily5sMonthlyHeatmapLoading = ref(false);
 
     const overTimeError = ref<string | null>(null);
     const byProcessError = ref<string | null>(null);
     const processFailureRateError = ref<string | null>(null);
-    const byProcessAndTurmaError = ref<string | null>(null);
-    const byDateAndProcessError = ref<string | null>(null);
     const daily5sMonthlyHeatmapError = ref<string | null>(null);
 
     const overTimeLastFetchedAt = ref<number | null>(null);
     const byProcessLastFetchedAt = ref<number | null>(null);
     const processFailureRateLastFetchedAt = ref<number | null>(null);
-    const byProcessAndTurmaLastFetchedAt = ref<number | null>(null);
-    const byProcessAndTurmaDays = ref(30);
-    const byDateAndProcessLastFetchedAt = ref<number | null>(null);
-    const byDateAndProcessDays = ref(30);
     const daily5sMonthlyHeatmapLastFetchedAt = ref<number | null>(null);
     const daily5sMonthlyHeatmapMonth = ref<string | null>(null);
 
@@ -117,6 +96,13 @@ export const useAnalyticsStore = defineStore(
     const checklistProcessFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
     const boardProcessFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
 
+    const checklistFailuresByProcessAndTurma = ref<FailuresByProcessAndTurmaData>(
+      EMPTY_FAILURES_BY_PROCESS_AND_TURMA,
+    );
+    const boardFailuresByProcessAndTurma = ref<FailuresByProcessAndTurmaData>(
+      EMPTY_FAILURES_BY_PROCESS_AND_TURMA,
+    );
+
     const checklistOverTimeLoading = ref(false);
     const boardOverTimeLoading = ref(false);
 
@@ -126,12 +112,20 @@ export const useAnalyticsStore = defineStore(
     const checklistProcessFailureRateLoading = ref(false);
     const boardProcessFailureRateLoading = ref(false);
 
+    const checklistByProcessAndTurmaLoading = ref(false);
+    const boardByProcessAndTurmaLoading = ref(false);
+    const checklistByProcessAndTurmaError = ref<string | null>(null);
+    const boardByProcessAndTurmaError = ref<string | null>(null);
+
+    const checklistByProcessAndTurmaLastFetchedAt = ref<number | null>(null);
+    const boardByProcessAndTurmaLastFetchedAt = ref<number | null>(null);
+    const checklistByProcessAndTurmaDays = ref(30);
+    const boardByProcessAndTurmaDays = ref(30);
+
     // Request deduplication
     let overTimeRequest: Promise<void> | null = null;
     let byProcessRequest: Promise<void> | null = null;
     let processFailureRateRequest: Promise<void> | null = null;
-    let byProcessAndTurmaRequest: Promise<void> | null = null;
-    let byDateAndProcessRequest: Promise<void> | null = null;
     let daily5sMonthlyHeatmapRequest: Promise<void> | null = null;
 
     let checklistOverTimeRequest: Promise<void> | null = null;
@@ -140,6 +134,8 @@ export const useAnalyticsStore = defineStore(
     let boardByProcessRequest: Promise<void> | null = null;
     let checklistProcessFailureRateRequest: Promise<void> | null = null;
     let boardProcessFailureRateRequest: Promise<void> | null = null;
+    let checklistByProcessAndTurmaRequest: Promise<void> | null = null;
+    let boardByProcessAndTurmaRequest: Promise<void> | null = null;
 
     // ── Legacy methods (for backward compatibility) ────────────────────────
 
@@ -357,94 +353,84 @@ export const useAnalyticsStore = defineStore(
       return request;
     }
 
-    async function loadAllAnalyticsByType(type: AuditType, force = false): Promise<void> {
+    async function loadFailuresByProcessAndTurmaByType(
+      type: AuditType,
+      force = false,
+      days = 30,
+    ): Promise<void> {
+      const targetRef =
+        type === 'rto' ? checklistFailuresByProcessAndTurma : boardFailuresByProcessAndTurma;
+      const loadingRef =
+        type === 'rto' ? checklistByProcessAndTurmaLoading : boardByProcessAndTurmaLoading;
+      const requestRef =
+        type === 'rto' ? checklistByProcessAndTurmaRequest : boardByProcessAndTurmaRequest;
+      const lastFetchedRef =
+        type === 'rto'
+          ? checklistByProcessAndTurmaLastFetchedAt
+          : boardByProcessAndTurmaLastFetchedAt;
+      const daysRef = type === 'rto' ? checklistByProcessAndTurmaDays : boardByProcessAndTurmaDays;
+
+      const hasCachedData = targetRef.value.labels.length > 0;
+
+      if (!force && hasCachedData && daysRef.value === days && !isStale(lastFetchedRef.value)) {
+        return;
+      }
+
+      if (requestRef) {
+        return requestRef;
+      }
+
+      const request = (async () => {
+        loadingRef.value = true;
+        if (type === 'rto') {
+          checklistByProcessAndTurmaError.value = null;
+        } else {
+          boardByProcessAndTurmaError.value = null;
+        }
+
+        try {
+          targetRef.value = await fetchFailuresByProcessAndTurma(type, days);
+          daysRef.value = days;
+          lastFetchedRef.value = Date.now();
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : 'Unable to load failures by process and turma.';
+          if (type === 'rto') {
+            checklistByProcessAndTurmaError.value = message;
+          } else {
+            boardByProcessAndTurmaError.value = message;
+          }
+          throw err;
+        } finally {
+          loadingRef.value = false;
+          if (type === 'rto') {
+            checklistByProcessAndTurmaRequest = null;
+          } else {
+            boardByProcessAndTurmaRequest = null;
+          }
+        }
+      })();
+
+      if (type === 'rto') {
+        checklistByProcessAndTurmaRequest = request;
+      } else {
+        boardByProcessAndTurmaRequest = request;
+      }
+
+      return request;
+    }
+
+    async function loadAllAnalyticsByType(
+      type: AuditType,
+      force = false,
+      days = 30,
+    ): Promise<void> {
       await Promise.all([
         loadFailuresOverTimeByType(type, force),
         loadFailuresByProcessByType(type, force),
         loadProcessFailureRatesByType(type, force),
+        loadFailuresByProcessAndTurmaByType(type, force, days),
       ]);
-    }
-
-    async function loadFailuresByProcessAndTurma(
-      type?: AuditType,
-      force = false,
-      days = 30,
-    ): Promise<void> {
-      const hasCachedData = failuresByProcessAndTurma.value.labels.length > 0;
-
-      if (
-        !force &&
-        hasCachedData &&
-        byProcessAndTurmaDays.value === days &&
-        !isStale(byProcessAndTurmaLastFetchedAt.value)
-      ) {
-        return;
-      }
-
-      if (byProcessAndTurmaRequest) {
-        return byProcessAndTurmaRequest;
-      }
-
-      byProcessAndTurmaRequest = (async () => {
-        byProcessAndTurmaLoading.value = true;
-        byProcessAndTurmaError.value = null;
-
-        try {
-          failuresByProcessAndTurma.value = await fetchFailuresByProcessAndTurma(type, days);
-          byProcessAndTurmaDays.value = days;
-          byProcessAndTurmaLastFetchedAt.value = Date.now();
-        } catch (err: unknown) {
-          byProcessAndTurmaError.value =
-            err instanceof Error ? err.message : 'Unable to load failures by process and turma.';
-          throw err;
-        } finally {
-          byProcessAndTurmaLoading.value = false;
-          byProcessAndTurmaRequest = null;
-        }
-      })();
-
-      return byProcessAndTurmaRequest;
-    }
-
-    async function loadFailuresByDateAndProcess(
-      type?: AuditType,
-      force = false,
-      days = 30,
-    ): Promise<void> {
-      const hasCachedData = failuresByDateAndProcess.value.labels.length > 0;
-
-      if (
-        !force &&
-        hasCachedData &&
-        byDateAndProcessDays.value === days &&
-        !isStale(byDateAndProcessLastFetchedAt.value)
-      ) {
-        return;
-      }
-
-      if (byDateAndProcessRequest) {
-        return byDateAndProcessRequest;
-      }
-
-      byDateAndProcessRequest = (async () => {
-        byDateAndProcessLoading.value = true;
-        byDateAndProcessError.value = null;
-
-        try {
-          failuresByDateAndProcess.value = await fetchFailuresByDateAndProcess(type, days);
-          byDateAndProcessDays.value = days;
-          byDateAndProcessLastFetchedAt.value = Date.now();
-        } catch (err: unknown) {
-          byDateAndProcessError.value =
-            err instanceof Error ? err.message : 'Unable to load failures by date and process.';
-          throw err;
-        } finally {
-          byDateAndProcessLoading.value = false;
-          byDateAndProcessRequest = null;
-        }
-      })();
-
-      return byDateAndProcessRequest;
     }
 
     async function refreshAllAnalytics(days = 30): Promise<void> {
@@ -452,8 +438,8 @@ export const useAnalyticsStore = defineStore(
         loadFailuresOverTime(true),
         loadFailuresByProcess(true),
         loadProcessFailureRates(true),
-        loadFailuresByProcessAndTurma(undefined, true, days),
-        loadFailuresByDateAndProcess(undefined, true, days),
+        loadFailuresByProcessAndTurmaByType('rto', true, days),
+        loadFailuresByProcessAndTurmaByType('board5s', true, days),
       ]);
     }
 
@@ -503,35 +489,23 @@ export const useAnalyticsStore = defineStore(
       failuresOverTime,
       failuresByProcess,
       processFailureRates,
-      failuresByProcessAndTurma,
-      failuresByDateAndProcess,
       daily5sMonthlyHeatmap,
       overTimeLoading,
       byProcessLoading,
       processFailureRateLoading,
-      byProcessAndTurmaLoading,
-      byDateAndProcessLoading,
       daily5sMonthlyHeatmapLoading,
       overTimeError,
       byProcessError,
       processFailureRateError,
-      byProcessAndTurmaError,
-      byDateAndProcessError,
       daily5sMonthlyHeatmapError,
       overTimeLastFetchedAt,
       byProcessLastFetchedAt,
       processFailureRateLastFetchedAt,
-      byProcessAndTurmaLastFetchedAt,
-      byProcessAndTurmaDays,
-      byDateAndProcessLastFetchedAt,
-      byDateAndProcessDays,
       daily5sMonthlyHeatmapLastFetchedAt,
       daily5sMonthlyHeatmapMonth,
       loadFailuresOverTime,
       loadFailuresByProcess,
       loadProcessFailureRates,
-      loadFailuresByProcessAndTurma,
-      loadFailuresByDateAndProcess,
       refreshAllAnalytics,
       loadDaily5sMonthlyHeatmap,
       refreshDaily5sMonthlyHeatmap,
@@ -542,15 +516,26 @@ export const useAnalyticsStore = defineStore(
       boardFailuresByProcess,
       checklistProcessFailureRates,
       boardProcessFailureRates,
+      checklistFailuresByProcessAndTurma,
+      boardFailuresByProcessAndTurma,
       checklistOverTimeLoading,
       boardOverTimeLoading,
       checklistByProcessLoading,
       boardByProcessLoading,
       checklistProcessFailureRateLoading,
       boardProcessFailureRateLoading,
+      checklistByProcessAndTurmaLoading,
+      boardByProcessAndTurmaLoading,
+      checklistByProcessAndTurmaError,
+      boardByProcessAndTurmaError,
+      checklistByProcessAndTurmaLastFetchedAt,
+      boardByProcessAndTurmaLastFetchedAt,
+      checklistByProcessAndTurmaDays,
+      boardByProcessAndTurmaDays,
       loadFailuresOverTimeByType,
       loadFailuresByProcessByType,
       loadProcessFailureRatesByType,
+      loadFailuresByProcessAndTurmaByType,
       loadAllAnalyticsByType,
     };
   },
@@ -562,15 +547,9 @@ export const useAnalyticsStore = defineStore(
         'failuresOverTime',
         'failuresByProcess',
         'processFailureRates',
-        'failuresByProcessAndTurma',
-        'failuresByDateAndProcess',
         'overTimeLastFetchedAt',
         'byProcessLastFetchedAt',
         'processFailureRateLastFetchedAt',
-        'byProcessAndTurmaLastFetchedAt',
-        'byProcessAndTurmaDays',
-        'byDateAndProcessLastFetchedAt',
-        'byDateAndProcessDays',
         'daily5sMonthlyHeatmap',
         'daily5sMonthlyHeatmapLastFetchedAt',
         'daily5sMonthlyHeatmapMonth',
@@ -581,6 +560,12 @@ export const useAnalyticsStore = defineStore(
         'boardFailuresByProcess',
         'checklistProcessFailureRates',
         'boardProcessFailureRates',
+        'checklistFailuresByProcessAndTurma',
+        'boardFailuresByProcessAndTurma',
+        'checklistByProcessAndTurmaLastFetchedAt',
+        'boardByProcessAndTurmaLastFetchedAt',
+        'checklistByProcessAndTurmaDays',
+        'boardByProcessAndTurmaDays',
       ],
     },
   },

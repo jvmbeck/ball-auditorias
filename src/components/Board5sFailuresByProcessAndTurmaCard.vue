@@ -2,6 +2,7 @@
   <q-card flat bordered class="failures-turma-card">
     <q-card-section>
       <p class="eyebrow">Insight Prioritário</p>
+      <p class="subtitle">Quadros 5S</p>
       <h2 class="title">Falhas por Processo e Turma</h2>
       <p class="subtitle">{{ subtitle }}</p>
     </q-card-section>
@@ -46,9 +47,9 @@ const props = defineProps<{
 }>();
 
 const analyticsStore = useAnalyticsStore();
-const loading = computed(() => analyticsStore.byProcessAndTurmaLoading);
-const error = computed(() => analyticsStore.byProcessAndTurmaError);
-const chartState = computed(() => analyticsStore.failuresByProcessAndTurma);
+const loading = computed(() => analyticsStore.boardByProcessAndTurmaLoading);
+const error = computed(() => analyticsStore.boardByProcessAndTurmaError);
+const chartState = computed(() => analyticsStore.boardFailuresByProcessAndTurma);
 const subtitle = computed(() => `Ultimos ${props.days} dias · Turmas A/C vs B/D`);
 
 const chartOption = computed(() => ({
@@ -123,7 +124,7 @@ watch(
   () => props.days,
   async (days) => {
     try {
-      await analyticsStore.loadFailuresByProcessAndTurma(undefined, false, days);
+      await analyticsStore.loadFailuresByProcessAndTurmaByType('board5s', false, days);
     } catch {
       // Error state is handled in the store.
     }

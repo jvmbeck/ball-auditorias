@@ -73,10 +73,13 @@ async function logout() {
   text-align: center;
 }
 
-@media (max-width: 798px) {
+@media (max-width: 768px) {
   q-avatar {
     width: 40px;
     height: 40px;
+  }
+  .avatar-title {
+    display: none;
   }
 }
 </style>

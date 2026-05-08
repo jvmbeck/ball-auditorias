@@ -311,6 +311,10 @@ function goToAuditHistory(): void {
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .index-shell {
+    padding: 1rem;
+    padding-top: 1rem;
+  }
   .analytics-header {
     flex-direction: column;
     align-items: stretch;

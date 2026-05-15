@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import Daily5sMonthlyHeatmapCard from 'src/components/Daily5sMonthlyHeatmapCard.vue';
+import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 function getCurrentMonthKey(): string {

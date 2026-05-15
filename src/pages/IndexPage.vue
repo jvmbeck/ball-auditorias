@@ -165,11 +165,11 @@ import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import Checklist5SCard from 'src/components/Checklist5SCard.vue';
-import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
+import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRatedProcessesCard.vue';
 import Daily5sScoreProgressCard from 'src/components/Daily5sScoreProgressCard.vue';
 import RtoBoard5sCard from 'src/components/rtoBoard5sCard.vue';
 import RtoFailuresByProcessAndTurmaCard from 'src/components/RtoFailuresByProcessAndTurmaCard.vue';
-import Board5sFailuresByProcessAndTurmaCard from 'src/components/Board5sFailuresByProcessAndTurmaCard.vue';
+import Board5sFailuresByProcessAndTurmaCard from 'src/components/rtoBoard5s/analytics/Board5sFailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 const $q = useQuasar();

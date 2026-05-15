@@ -3,7 +3,7 @@
     <q-card class="daily5s-info-dialog">
       <q-card-section class="row items-center q-pb-none">
         <div>
-          <div class="text-overline">Guia de Pontuacao 5S</div>
+          <div class="text-overline">Guia de Pontuação 5S</div>
           <div class="text-h6">{{ processLabel }}</div>
         </div>
         <q-space />

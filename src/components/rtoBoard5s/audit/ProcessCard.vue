@@ -54,7 +54,7 @@
           multiple
           clearable
           accept="image/*"
-          label="Envie fotos como evidencia"
+          label="Envie fotos como evidência"
           bottom-slots
           @update:model-value="onFilesChange"
         >

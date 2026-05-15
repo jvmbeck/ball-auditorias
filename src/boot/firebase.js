@@ -10,6 +10,7 @@ import { useAuthStore } from 'stores/auth.store';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase's API are public by design, rules are set so unauthenticated users can't read/write data.
 const firebaseConfig = {
   apiKey: 'AIzaSyAnmFT9TctviLXpaI6W3fPxvIDwFCE-qg4',
   authDomain: 'ball-auditorias.firebaseapp.com',

@@ -131,7 +131,7 @@ import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import Daily5sProcessCard from 'src/components/Daily5sProcessCard.vue';
-import Daily5sRatedProcessesCard from 'src/components/Daily5sRatedProcessesCard.vue';
+import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRatedProcessesCard.vue';
 import {
   DAILY5S_BACKEND_PROCESS_DEFINITIONS,
   DAILY5S_FRONTEND_PROCESS_DEFINITIONS,

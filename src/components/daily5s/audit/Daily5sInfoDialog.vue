@@ -55,7 +55,7 @@
         </q-carousel>
 
         <q-banner v-else rounded class="bg-blue-1 text-blue-9">
-          Ainda nao ha imagens de referencia para este processo.
+          Ainda não há imagens de referência para este processo.
         </q-banner>
       </q-card-section>
     </q-card>
@@ -194,7 +194,7 @@ function openFullscreenImage(imageUrl: string) {
   object-fit: contain;
   object-position: center;
   border-radius: 10px;
-  background: #f6f9fb;
+  background: darkgrey;
 }
 
 .fullscreen-card {

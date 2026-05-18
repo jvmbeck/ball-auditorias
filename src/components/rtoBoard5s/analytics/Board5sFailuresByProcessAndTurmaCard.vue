@@ -90,7 +90,7 @@ const chartOption = computed(() => ({
       barWidth: 14,
       itemStyle: {
         borderRadius: [0, 6, 6, 0],
-        color: '#c92a2a',
+        color: '#1f5d98',
       },
       label: {
         show: true,
@@ -98,7 +98,7 @@ const chartOption = computed(() => ({
         color: '#4a5f67',
         fontWeight: 700,
       },
-      emphasis: { itemStyle: { color: '#a82020' } },
+      emphasis: { itemStyle: { color: '#1f5d98' } },
     },
     {
       name: 'Turma B e D',
@@ -107,7 +107,7 @@ const chartOption = computed(() => ({
       barWidth: 14,
       itemStyle: {
         borderRadius: [0, 6, 6, 0],
-        color: '#ff7f50',
+        color: '#af2a2a',
       },
       label: {
         show: true,
@@ -115,7 +115,7 @@ const chartOption = computed(() => ({
         color: '#4a5f67',
         fontWeight: 700,
       },
-      emphasis: { itemStyle: { color: '#e06030' } },
+      emphasis: { itemStyle: { color: '#af2a2a' } },
     },
   ],
 }));

@@ -34,7 +34,19 @@
           </p>
         </div>
 
-        <Daily5sIssueAnalyticsCard :month-key="selectedMonth" :refresh-token="refreshToken" />
+        <Daily5sIssueAnalyticsCard
+          :month-key="selectedMonth"
+          :refresh-token="refreshToken"
+          @update:date-range="onDateRangeUpdate"
+        />
+
+        <Daily5sTop5Rating1Card
+          :month-key="selectedMonth"
+          :start-date-key="currentDateRange.from"
+          :end-date-key="currentDateRange.to"
+          :refresh-token="refreshToken"
+          class="q-mt-lg"
+        />
       </section>
     </div>
   </q-page>
@@ -45,15 +57,34 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Daily5sIssueAnalyticsCard from 'src/components/daily5s/analytics/Daily5sIssueAnalyticsCard.vue';
 import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
+import Daily5sTop5Rating1Card from 'src/components/daily5s/analytics/Daily5sTop5Rating1Card.vue';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 function getCurrentMonthKey(): string {
   return toDateKey(new Date()).slice(0, 7);
 }
 
+function getMonthDefaultRange(monthKey: string): { from: string; to: string } {
+  const [yearPart, monthPart] = monthKey.split('-');
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  if (!year || !month) {
+    const fallback = toDateKey(new Date()).slice(0, 7);
+    return { from: `${fallback}-01`, to: `${fallback}-28` };
+  }
+  const from = toDateKey(new Date(year, month - 1, 1));
+  const to = toDateKey(new Date(year, month, 0));
+  return { from, to };
+}
+
 const router = useRouter();
 const selectedMonth = ref(getCurrentMonthKey());
 const refreshToken = ref(0);
+const currentDateRange = ref(getMonthDefaultRange(selectedMonth.value));
+
+function onDateRangeUpdate(range: { from: string; to: string }): void {
+  currentDateRange.value = range;
+}
 
 function handleRefresh(): void {
   refreshToken.value += 1;

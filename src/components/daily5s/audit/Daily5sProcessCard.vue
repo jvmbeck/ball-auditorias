@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { DAILY5S_ISSUE_REASONS } from 'src/services/audit/daily5sDefinitions';
 import type { Daily5sRatingValue } from 'src/types/audit';
 import Daily5sInfoDialog from './Daily5sInfoDialog.vue';
 
@@ -145,12 +146,7 @@ const ratingOptions: Array<{ label: string; value: Daily5sRatingValue }> = [
   { label: '5', value: 5 },
 ];
 
-const commentOptions = [
-  'Latas acumuladas',
-  'Sujeira no Piso',
-  'Sujeira nas Máquinas',
-  'Desorganização',
-];
+const commentOptions = DAILY5S_ISSUE_REASONS;
 
 const statusChip = computed(() => {
   if (props.modelValue.rating === 1) {

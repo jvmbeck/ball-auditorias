@@ -219,6 +219,12 @@ export interface Daily5sIssueByReasonAndTurmaData {
   grandTotal: number;
 }
 
+export interface Daily5sRating1ByProcessData {
+  labels: string[];
+  data: number[];
+  total: number;
+}
+
 /** Write-side shape for a single analytics record in a process-results collection. */
 export interface rtoAuditResultDocument {
   auditId: string;

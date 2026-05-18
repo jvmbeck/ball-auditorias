@@ -41,7 +41,7 @@
               flat
               color="white"
               class="expand-image-btn"
-              @click="openFullscreenImage(imageUrl)"
+              @click="openFullscreenImage(index)"
             >
               <q-tooltip anchor="top middle" self="bottom middle">Ver em tela cheia</q-tooltip>
             </q-btn>
@@ -70,12 +70,30 @@
       </q-card-section>
 
       <q-card-section class="fullscreen-image-wrapper">
-        <img
-          v-if="fullscreenImageUrl"
-          :src="fullscreenImageUrl"
-          :alt="`Referencia em tela cheia - ${processLabel}`"
-          class="fullscreen-image"
-        />
+        <q-carousel
+          v-if="referenceImages.length > 0"
+          v-model="currentSlide"
+          arrows
+          navigation
+          animated
+          swipeable
+          infinite
+          height="100%"
+          class="fullscreen-carousel"
+        >
+          <q-carousel-slide
+            v-for="(imageUrl, index) in referenceImages"
+            :key="`fullscreen-${imageUrl}`"
+            :name="index"
+            class="fullscreen-carousel-slide"
+          >
+            <img
+              :src="imageUrl"
+              :alt="`Referencia em tela cheia ${index + 1} - ${processLabel}`"
+              class="fullscreen-image"
+            />
+          </q-carousel-slide>
+        </q-carousel>
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -109,7 +127,6 @@ const currentSlide = ref(0);
 const referenceImages = ref<string[]>([]);
 const isLoadingImages = ref(false);
 const isFullscreenOpen = ref(false);
-const fullscreenImageUrl = ref<string | null>(null);
 
 let requestId = 0;
 
@@ -137,8 +154,8 @@ watch(
   { immediate: true },
 );
 
-function openFullscreenImage(imageUrl: string) {
-  fullscreenImageUrl.value = imageUrl;
+function openFullscreenImage(index: number) {
+  currentSlide.value = index;
   isFullscreenOpen.value = true;
 }
 </script>
@@ -162,13 +179,11 @@ function openFullscreenImage(imageUrl: string) {
 }
 
 .carousel-loading {
-  border-radius: 14px;
   border: 1px dashed #bdd4dd;
   min-height: 120px;
 }
 
 .reference-carousel {
-  border-radius: 14px;
   background: #e8eff2;
 }
 
@@ -193,7 +208,6 @@ function openFullscreenImage(imageUrl: string) {
   height: 100%;
   object-fit: contain;
   object-position: center;
-  border-radius: 10px;
   background: darkgrey;
 }
 
@@ -203,10 +217,58 @@ function openFullscreenImage(imageUrl: string) {
 
 .fullscreen-image-wrapper {
   height: calc(100vh - 64px);
+  padding: 8px 10px 12px;
+}
+
+.fullscreen-carousel {
+  height: 100%;
+  background: #0b171c;
+}
+
+.fullscreen-carousel-slide {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 8px;
+}
+
+.fullscreen-carousel :deep(.q-carousel__arrow .q-btn) {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.fullscreen-carousel :deep(.q-carousel__navigation .q-btn) {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+}
+
+@media (max-width: 600px) {
+  .fullscreen-carousel :deep(.q-carousel__arrow .q-btn) {
+    width: 58px;
+    height: 58px;
+    min-width: 58px;
+    min-height: 58px;
+  }
+
+  .fullscreen-carousel :deep(.q-carousel__arrow--left) {
+    left: 2px;
+  }
+
+  .fullscreen-carousel :deep(.q-carousel__arrow--right) {
+    right: 2px;
+  }
+
+  .fullscreen-carousel :deep(.q-carousel__navigation .q-btn) {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+  }
 }
 
 .fullscreen-image {

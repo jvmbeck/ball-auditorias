@@ -172,6 +172,10 @@ const props = withDefaults(
   },
 );
 
+const emit = defineEmits<{
+  'update:dateRange': [range: { from: string; to: string }];
+}>();
+
 function getMonthKey(monthKey: string): string {
   return /^\d{4}-\d{2}$/.test(monthKey) ? monthKey : toDateKey(new Date()).slice(0, 7);
 }
@@ -273,6 +277,8 @@ function syncDraftRange(): void {
 
 function applyRange(): void {
   appliedRange.value = normalizeRange(draftRange.value);
+  const { from, to } = appliedRange.value;
+  emit('update:dateRange', { from, to: to ?? from });
 }
 
 function resetRange(): void {
@@ -478,6 +484,8 @@ async function loadIssueAnalytics(): Promise<void> {
 
 onMounted(() => {
   void loadIssueAnalytics();
+  const { from, to } = appliedRange.value;
+  emit('update:dateRange', { from, to: to ?? from });
 });
 
 watch(

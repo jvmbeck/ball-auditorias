@@ -24,6 +24,18 @@
       </section>
 
       <Daily5sMonthlyHeatmapCard :month-key="selectedMonth" :refresh-token="refreshToken" />
+
+      <section class="issues-section q-mt-xl">
+        <div class="section-header q-mb-md">
+          <p class="section-eyebrow">Nova camada de análise</p>
+          <h2 class="section-title">Issues Daily 5S</h2>
+          <p class="section-subtitle">
+            Explore os motivos de nota 1 por turma e ao longo do mês, com comparação ao total geral.
+          </p>
+        </div>
+
+        <Daily5sIssueAnalyticsCard :month-key="selectedMonth" :refresh-token="refreshToken" />
+      </section>
     </div>
   </q-page>
 </template>
@@ -31,6 +43,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import Daily5sIssueAnalyticsCard from 'src/components/daily5s/analytics/Daily5sIssueAnalyticsCard.vue';
 import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
 import { toDateKey } from 'src/utils/dateFormatting';
 
@@ -133,5 +146,34 @@ function goBack(): void {
   .month-input {
     width: 100%;
   }
+}
+
+.issues-section {
+  margin-bottom: 12px;
+}
+
+.section-header {
+  padding: 0 4px;
+}
+
+.section-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: #6e8490;
+}
+
+.section-title {
+  margin: 6px 0 4px;
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  line-height: 1.1;
+  color: #17343d;
+}
+
+.section-subtitle {
+  margin: 0;
+  color: #5f7077;
+  font-size: 0.9rem;
 }
 </style>

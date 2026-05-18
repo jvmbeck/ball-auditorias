@@ -82,7 +82,12 @@
       />
     </q-card-section>
 
-    <Daily5sInfoDialog v-model="isInfoOpen" :process-label="label" :guidance="guidance" />
+    <Daily5sInfoDialog
+      v-model="isInfoOpen"
+      :process-key="processKey"
+      :process-label="label"
+      :guidance="guidance"
+    />
   </q-card>
 </template>
 

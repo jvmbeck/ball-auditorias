@@ -193,8 +193,8 @@ import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
 import { useDualAuditStore } from 'src/stores/dualAudit.store';
-import ProcessCard from 'src/components/ProcessCard.vue';
-import PrinterProcessCard from 'src/components/PrinterProcessCard.vue';
+import ProcessCard from 'src/components/rtoBoard5s/audit/ProcessCard.vue';
+import PrinterProcessCard from 'src/components/rtoBoard5s/audit/PrinterProcessCard.vue';
 import { getProcessSavedStatus } from 'src/services/audit/auditProcessResults';
 import type {
   AuditType,

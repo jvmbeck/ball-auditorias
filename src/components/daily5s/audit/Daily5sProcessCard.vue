@@ -37,18 +37,22 @@
 
       <div v-if="modelValue.rating === 1" class="q-mt-md">
         <q-banner dense rounded class="bg-red-1 text-red-9 q-mb-md">
-          Nota 1 exige justificativa com descricao e imagem.
+          Nota 1 exige justificativa com descrição e imagem.
         </q-banner>
 
-        <q-input
+        <q-select
           :model-value="modelValue.comment"
-          autogrow
+          :options="commentOptions"
           outlined
-          type="textarea"
-          label="Descreva o motivo da nota 1"
+          clearable
+          label="Selecione o motivo da nota 1"
           class="q-mb-md"
           @update:model-value="onCommentChange"
-        />
+        >
+          <template #prepend>
+            <q-icon name="playlist_add_check" />
+          </template>
+        </q-select>
 
         <q-file
           :model-value="files"
@@ -84,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { DAILY5S_ISSUE_REASONS } from 'src/services/audit/daily5sDefinitions';
 import type { Daily5sRatingValue } from 'src/types/audit';
 import Daily5sInfoDialog from './Daily5sInfoDialog.vue';
 
@@ -141,6 +146,8 @@ const ratingOptions: Array<{ label: string; value: Daily5sRatingValue }> = [
   { label: '5', value: 5 },
 ];
 
+const commentOptions = DAILY5S_ISSUE_REASONS;
+
 const statusChip = computed(() => {
   if (props.modelValue.rating === 1) {
     return { label: 'Nota 1', color: 'negative' };
@@ -182,7 +189,7 @@ function onRatingChange(value: Daily5sRatingValue | null) {
   }
 }
 
-function onCommentChange(value: string | number | null) {
+function onCommentChange(value: string | null) {
   emit('update:modelValue', {
     ...props.modelValue,
     comment: String(value ?? ''),

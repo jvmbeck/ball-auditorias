@@ -6,8 +6,8 @@
           <p class="eyebrow">Daily 5S</p>
           <h1 class="page-title">Auditoria Daily 5S</h1>
           <p class="page-subtitle">
-            Escolha os processos que deseja avaliar hoje e atribua nota 1, 3 ou 5 para cada area.
-            Nota 1 exige justificativa com descricao e foto.
+            Escolha os processos que deseja avaliar hoje e atribua nota 1, 3 ou 5 para cada área.
+            Nota 1 exige justificativa com descrição e foto.
           </p>
         </div>
       </section>
@@ -22,7 +22,7 @@
             map-options
             options-dense
             :options="turmaOptions"
-            label="Turma responsavel"
+            label="Turma responsável"
           />
         </div>
 
@@ -130,7 +130,7 @@ import { computed, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
-import Daily5sProcessCard from 'src/components/Daily5sProcessCard.vue';
+import Daily5sProcessCard from 'src/components/daily5s/audit/Daily5sProcessCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRatedProcessesCard.vue';
 import {
   DAILY5S_BACKEND_PROCESS_DEFINITIONS,

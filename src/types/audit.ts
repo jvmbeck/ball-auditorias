@@ -6,6 +6,12 @@ export type AuditType = 'rto' | 'board5s' | 'daily5s';
 
 export type Daily5sRatingValue = 1 | 3 | 5;
 
+export type Daily5sIssueReason =
+  | 'Latas acumuladas'
+  | 'Sujeira no Piso'
+  | 'Sujeira nas Máquinas'
+  | 'Desorganização';
+
 export type PrinterCheckKey = 'printer1' | 'printer2' | 'printer3';
 
 export type RtoAuditProcessKey =
@@ -174,6 +180,49 @@ export interface Daily5sMonthlyHeatmapData {
   processLabels: string[];
   xAxisCategories: Daily5sHeatmapCategory[];
   points: Daily5sHeatmapPoint[];
+}
+
+export interface Daily5sIssueAnalyticsBucket {
+  key: string;
+  date: string;
+  turma: Daily5sTurma | null;
+  displayLabel: string;
+  countsByReason: Record<Daily5sIssueReason, number>;
+  total: number;
+}
+
+export interface Daily5sIssueAnalyticsSeries {
+  key: Daily5sIssueReason;
+  label: string;
+  color: string;
+  data: number[];
+}
+
+export interface Daily5sIssueAnalyticsViewData {
+  labels: string[];
+  buckets: Daily5sIssueAnalyticsBucket[];
+  series: Daily5sIssueAnalyticsSeries[];
+  grandTotal: number;
+}
+
+export interface Daily5sIssueAnalyticsData {
+  monthKey: string;
+  byTurmaTime: Daily5sIssueAnalyticsViewData;
+  overall: Daily5sIssueAnalyticsViewData;
+  byReasonAndTurma: Daily5sIssueByReasonAndTurmaData;
+}
+
+export interface Daily5sIssueByReasonAndTurmaData {
+  reasons: Daily5sIssueReason[];
+  seriesAC: number[];
+  seriesBD: number[];
+  grandTotal: number;
+}
+
+export interface Daily5sRating1ByProcessData {
+  labels: string[];
+  data: number[];
+  total: number;
 }
 
 /** Write-side shape for a single analytics record in a process-results collection. */

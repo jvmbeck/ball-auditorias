@@ -2,6 +2,19 @@ import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
 export type Daily5sProcessSection = 'frontEnd' | 'backEnd';
 
+export const DAILY5S_ISSUE_REASONS = [
+  'Latas acumuladas',
+  'Sujeira no Piso',
+  'Sujeira nas Máquinas',
+  'Desorganização',
+] as const;
+
+export type Daily5sIssueReason = (typeof DAILY5S_ISSUE_REASONS)[number];
+
+export function isDaily5sIssueReason(value: unknown): value is Daily5sIssueReason {
+  return typeof value === 'string' && DAILY5S_ISSUE_REASONS.includes(value as Daily5sIssueReason);
+}
+
 export interface Daily5sProcessDefinition {
   key: Daily5sAuditProcessKey;
   section: Daily5sProcessSection;

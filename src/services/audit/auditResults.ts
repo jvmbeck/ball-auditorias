@@ -5,7 +5,6 @@ import type {
   AuditDocument,
   RtoAuditProcessKey,
   rtoAuditResultDocument,
-  UpdatableProcessStatus,
   DualTypeAuditDocument,
 } from 'src/types/audit';
 
@@ -61,7 +60,7 @@ export async function createAuditResults(auditId: string, audit: AuditDocument):
 
   const writes = processEntries.map(([processKey, process]) => {
     // Use `updated` as a safe fallback for any process left in a null state at completion.
-    const status = (process.status ?? 'updated') as UpdatableProcessStatus;
+    const status = process.status ?? 'updated';
 
     const payload: rtoAuditResultDocument = {
       auditId,

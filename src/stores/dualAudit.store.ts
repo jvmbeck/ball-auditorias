@@ -10,7 +10,6 @@ import type {
   PrinterCheckKey,
   PrinterChecks,
   RtoAuditProcessKey,
-  UpdatableProcessStatus,
 } from 'src/types/audit';
 
 // ─── Internal types ──────────────────────────────────────────────────────
@@ -387,7 +386,7 @@ export const useDualAuditStore = defineStore(
             sessionId,
             turma.value,
             rtoProcessKey,
-            printerStatus as UpdatableProcessStatus,
+            printerStatus,
             buildPrinterSummaryComment(checklistPrinterState),
             null,
             {
@@ -416,7 +415,7 @@ export const useDualAuditStore = defineStore(
           sessionId,
           turma.value,
           rtoProcessKey,
-          status as UpdatableProcessStatus,
+          status,
           comment || null,
           status === 'not_updated' ? files : null,
         );
@@ -444,7 +443,7 @@ export const useDualAuditStore = defineStore(
         sessionId,
         turma.value,
         boardProcessKey,
-        status as UpdatableProcessStatus,
+        status,
         comment || null,
         status === 'not_updated' ? files : null,
       );

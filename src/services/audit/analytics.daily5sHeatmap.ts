@@ -10,7 +10,6 @@ import type {
   Daily5sHeatmapPoint,
   Daily5sHeatmapValue,
   Daily5sMonthlyHeatmapData,
-  Daily5sRatingValue,
   Daily5sTurma,
 } from 'src/types/audit';
 import { toDateKey } from 'src/utils/dateFormatting';
@@ -96,7 +95,7 @@ function getTimestampMs(value: unknown): number {
     typeof value === 'object' &&
     value !== null &&
     'toMillis' in value &&
-    typeof (value as { toMillis: unknown }).toMillis === 'function'
+    typeof value.toMillis === 'function'
   ) {
     return (value as { toMillis: () => number }).toMillis();
   }
@@ -106,7 +105,7 @@ function getTimestampMs(value: unknown): number {
 
 function normalizeRating(rating: unknown, status: unknown): Daily5sHeatmapValue {
   if (rating === 1 || rating === 3 || rating === 5) {
-    return rating as Daily5sRatingValue;
+    return rating;
   }
 
   if (status === 'not_updated') {
@@ -152,8 +151,7 @@ export async function fetchDaily5sMonthlyHeatmap(
     }>;
 
     const date = typeof data.date === 'string' ? data.date : null;
-    const turma =
-      data.turma === 'A e C' || data.turma === 'B e D' ? (data.turma as Daily5sTurma) : null;
+    const turma = data.turma === 'A e C' || data.turma === 'B e D' ? data.turma : null;
     const process = data.process;
 
     if (!date || !turma || typeof process !== 'string' || !isDaily5sProcessKey(process)) {

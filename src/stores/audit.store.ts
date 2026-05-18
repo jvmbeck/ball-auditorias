@@ -9,12 +9,7 @@ import {
   updateProcess,
 } from 'src/services/audit';
 import { useAuthStore } from 'stores/auth.store';
-import type {
-  AuditHistoryItem,
-  AuditProcessKey,
-  AuditProcessStatus,
-  UpdatableProcessStatus,
-} from 'src/types/audit';
+import type { AuditHistoryItem, AuditProcessKey, AuditProcessStatus } from 'src/types/audit';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -224,13 +219,7 @@ export const useAuditStore = defineStore(
 
       const file = processFiles[processKey];
 
-      await updateProcess(
-        auditId.value,
-        processKey,
-        status as UpdatableProcessStatus,
-        comment || null,
-        file,
-      );
+      await updateProcess(auditId.value, processKey, status, comment || null, file);
 
       processFiles[processKey] = null;
     }

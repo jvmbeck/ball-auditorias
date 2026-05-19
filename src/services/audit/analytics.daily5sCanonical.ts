@@ -167,11 +167,7 @@ function toPercentage(score: number): number {
   return Number(((score / DAILY5S_MAX_SCORE) * 100).toFixed(1));
 }
 
-function normalizeRange(
-  monthKey: string,
-  startDateKey?: string,
-  endDateKey?: string,
-): DateRange {
+function normalizeRange(monthKey: string, startDateKey?: string, endDateKey?: string): DateRange {
   const { startKey, endKey } = toMonthBounds(monthKey);
 
   let from = isDateKey(startDateKey) ? startDateKey : startKey;
@@ -184,9 +180,11 @@ function normalizeRange(
   return { from, to };
 }
 
-export function toMonthBounds(
-  monthKey: string,
-): { startKey: string; endKey: string; monthKey: string } {
+export function toMonthBounds(monthKey: string): {
+  startKey: string;
+  endKey: string;
+  monthKey: string;
+} {
   const valid = /^\d{4}-\d{2}$/.test(monthKey);
   const base = valid ? `${monthKey}-01` : `${toDateKey(new Date()).slice(0, 7)}-01`;
 
@@ -450,8 +448,9 @@ export function deriveDaily5sTopRating1ByProcess(
       return;
     }
 
-    const processLabel = DAILY5S_PROCESS_DEFINITIONS.find((definition) => definition.key === row.process)
-      ?.label;
+    const processLabel = DAILY5S_PROCESS_DEFINITIONS.find(
+      (definition) => definition.key === row.process,
+    )?.label;
 
     if (!processLabel) {
       return;

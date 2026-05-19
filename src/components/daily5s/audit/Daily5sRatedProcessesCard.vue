@@ -4,49 +4,58 @@
       <div class="header q-mb-sm">
         <q-icon name="fact_check" size="24px" color="primary" class="q-mr-sm" />
         <div>
-          <div class="title">Processos Avaliados Hoje</div>
-          <div class="subtitle">Lista de processos já registrados na auditoria diária de 5S.</div>
+          <div class="title">Processos do dia</div>
+          <div class="subtitle">Status de cada processo e as pessoas responsáveis.</div>
         </div>
+
+        <q-chip class="q-ml-auto" color="primary" text-color="white" icon="calendar_today">
+          {{ ratedCount }}/{{ totalCount }} avaliados
+        </q-chip>
       </div>
 
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="24px" />
-        <span>Carregando processos...</span>
+        <span>Carregando processos do dia...</span>
       </div>
 
-      <div v-else-if="!ratedProcesses.length" class="state-box">
-        <q-icon name="schedule" size="20px" color="grey-7" />
-        <span>Nenhum processo avaliado hoje.</span>
+      <div v-else-if="!inspectorId" class="state-box">
+        <q-icon name="login" size="20px" color="grey-7" />
+        <span>Faça login para ver os processos do dia.</span>
       </div>
 
-      <div v-else class="list-shell">
-        <div v-if="ratedFrontEndProcesses.length" class="section-list">
-          <div class="section-title">Front End</div>
-          <q-list dense separator>
-            <q-item v-for="process in ratedFrontEndProcesses" :key="process.key">
-              <q-item-section avatar>
-                <q-icon name="check_circle" color="positive" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ process.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </div>
+      <div v-else class="table-shell">
+        <q-table
+          flat
+          bordered
+          dense
+          class="process-table"
+          row-key="key"
+          :columns="columns"
+          :rows="rows"
+          v-model:pagination="pagination"
+          :rows-per-page-options="[0]"
+          hide-bottom
+        >
+          <template #body-cell-status="{ row }">
+            <td class="status-cell">
+              <q-icon
+                :name="row.rated ? 'check_circle' : 'close'"
+                :color="row.rated ? 'positive' : 'negative'"
+                size="18px"
+                class="q-mr-xs"
+              />
+              <span :class="row.rated ? 'status-label--rated' : 'status-label--pending'">
+                {{ row.rated ? 'Avaliado hoje' : 'Pendente' }}
+              </span>
+            </td>
+          </template>
 
-        <div v-if="ratedBackEndProcesses.length" class="section-list">
-          <div class="section-title">Back End</div>
-          <q-list dense separator>
-            <q-item v-for="process in ratedBackEndProcesses" :key="process.key">
-              <q-item-section avatar>
-                <q-icon name="check_circle" color="positive" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ process.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </div>
+          <template #body-cell-process="{ row }">
+            <td>
+              <div class="process-label">{{ row.label }}</div>
+            </td>
+          </template>
+        </q-table>
       </div>
     </q-card-section>
   </q-card>
@@ -56,11 +65,20 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
 import { getTodaysDaily5sStatus } from 'src/services/audit';
-import {
-  DAILY5S_PROCESS_LABELS,
-  DAILY5S_PROCESS_SECTION_BY_KEY,
-} from 'src/services/audit/daily5sDefinitions';
+import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit/daily5sDefinitions';
+import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
+import type { QTableProps } from 'quasar';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
+import type { Daily5sTodayStatus } from 'src/services/audit/daily5sStatus';
+
+interface ProcessRow {
+  key: Daily5sAuditProcessKey;
+  label: string;
+  rated: boolean;
+  auditor: string;
+  backup: string;
+  responsible: string;
+}
 
 const props = withDefaults(
   defineProps<{
@@ -71,42 +89,90 @@ const props = withDefaults(
   },
 );
 
+const collator = new Intl.Collator('pt-BR', { sensitivity: 'base' });
+
+const columns: QTableProps['columns'] = [
+  {
+    name: 'status',
+    label: 'Status',
+    field: 'rated',
+    sortable: true,
+    align: 'left',
+    style: 'width: 160px',
+    sort: (a: boolean, b: boolean, rowA: ProcessRow, rowB: ProcessRow) => {
+      if (a === b) return collator.compare(rowA.label, rowB.label);
+      return a ? 1 : -1;
+    },
+  },
+  {
+    name: 'process',
+    label: 'Processo',
+    field: 'label',
+    sortable: true,
+    align: 'left',
+    sort: (a: string, b: string) => collator.compare(a, b),
+  },
+  {
+    name: 'auditor',
+    label: 'Auditor',
+    field: 'auditor',
+    sortable: true,
+    align: 'left',
+    sort: (a: string, b: string, rowA: ProcessRow, rowB: ProcessRow) => {
+      const cmp = collator.compare(a, b);
+      return cmp !== 0 ? cmp : collator.compare(rowA.label, rowB.label);
+    },
+  },
+  { name: 'backup', label: 'Backup', field: 'backup', sortable: false, align: 'left' },
+  {
+    name: 'responsible',
+    label: 'Responsável',
+    field: 'responsible',
+    sortable: false,
+    align: 'left',
+  },
+];
+
+const pagination = ref({ sortBy: 'process', descending: false, rowsPerPage: 0 });
+
 const authStore = useAuthStore();
+const inspectorId = computed(() => authStore.firebaseUser?.uid ?? null);
 const loading = ref(false);
-const ratedProcesses = ref<Array<{ key: Daily5sAuditProcessKey; label: string }>>([]);
+const todayStatus = ref<Daily5sTodayStatus | null>(null);
 
-const ratedFrontEndProcesses = computed(() =>
-  ratedProcesses.value.filter(
-    (process) => DAILY5S_PROCESS_SECTION_BY_KEY[process.key] === 'frontEnd',
-  ),
+const totalCount = computed(() => DAILY5S_PROCESS_DEFINITIONS.length);
+const ratedCount = computed(() => todayStatus.value?.ratedProcessKeys.length ?? 0);
+
+const ratedProcessKeySet = computed(
+  () => new Set<Daily5sAuditProcessKey>(todayStatus.value?.ratedProcessKeys ?? []),
 );
 
-const ratedBackEndProcesses = computed(() =>
-  ratedProcesses.value.filter(
-    (process) => DAILY5S_PROCESS_SECTION_BY_KEY[process.key] === 'backEnd',
-  ),
+const rows = computed<ProcessRow[]>(() =>
+  DAILY5S_PROCESS_DEFINITIONS.map((definition) => {
+    const roster = DAILY5S_PROCESS_ROSTER[definition.key];
+    const rated = ratedProcessKeySet.value.has(definition.key);
+
+    return {
+      key: definition.key,
+      label: definition.label,
+      rated,
+      auditor: roster.auditor || 'A definir',
+      backup: roster.backup || 'A definir',
+      responsible: roster.responsible || 'A definir',
+    };
+  }),
 );
 
-async function loadRatedProcesses() {
-  const inspectorId = authStore.firebaseUser?.uid;
-  if (!inspectorId) {
-    ratedProcesses.value = [];
+async function loadRatedProcesses(): Promise<void> {
+  if (!inspectorId.value) {
+    todayStatus.value = null;
     return;
   }
 
   loading.value = true;
 
   try {
-    const status = await getTodaysDaily5sStatus(inspectorId);
-    if (!status) {
-      ratedProcesses.value = [];
-      return;
-    }
-
-    ratedProcesses.value = status.ratedProcessKeys.map((key) => ({
-      key,
-      label: DAILY5S_PROCESS_LABELS[key],
-    }));
+    todayStatus.value = await getTodaysDaily5sStatus(inspectorId.value);
   } finally {
     loading.value = false;
   }
@@ -115,6 +181,13 @@ async function loadRatedProcesses() {
 onMounted(() => {
   void loadRatedProcesses();
 });
+
+watch(
+  () => inspectorId.value,
+  () => {
+    void loadRatedProcesses();
+  },
+);
 
 watch(
   () => props.refreshToken,
@@ -126,9 +199,20 @@ watch(
 
 <style scoped>
 .rated-card {
+  height: 400px;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
   border-radius: 24px;
   background: white;
   box-shadow: 0 18px 48px rgba(29, 49, 57, 0.08);
+}
+
+.rated-card :deep(.q-card__section) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .header {
@@ -147,29 +231,59 @@ watch(
   font-size: 0.85rem;
 }
 
-.list-shell {
-  max-height: 190px;
-  overflow-y: auto;
-  border: 1px solid #e6ecef;
+.table-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.process-table {
+  flex: 1;
+  min-height: 0;
   border-radius: 12px;
-  padding: 10px;
 }
 
-.section-list + .section-list {
-  margin-top: 12px;
+.process-table :deep(thead tr th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: white;
 }
 
-.section-title {
-  margin: 0 0 6px;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #5f7077;
+.process-table :deep(.q-table__middle) {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.process-table :deep(th),
+.process-table :deep(td) {
+  vertical-align: middle;
+}
+
+.status-cell {
+  white-space: nowrap;
+}
+
+.status-label--rated {
+  color: #2e9f5f;
   font-weight: 700;
+}
+
+.status-label--pending {
+  color: #d64545;
+  font-weight: 700;
+}
+
+.process-label {
+  font-weight: 700;
+  color: #17343d;
 }
 
 .state-box {
   min-height: 86px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;

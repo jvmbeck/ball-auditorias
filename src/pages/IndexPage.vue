@@ -293,9 +293,10 @@ function goToAuditHistory(): void {
 }
 
 .daily5s-grid {
-  display: grid;
+  display: flex;
   grid-template-columns: minmax(320px, 1.1fr) minmax(280px, 0.9fr);
   gap: 1.25rem;
+  max-height: 400px;
 }
 
 /* Responsive adjustments */

@@ -35,3 +35,6 @@ yarn-error.log*
 
 # copilot prompt md files
 /.github/prompts
+
+# firebase cache files
+/.firebase/*

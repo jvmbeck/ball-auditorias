@@ -97,7 +97,8 @@
               <p class="eyebrow">Análises</p>
               <h2 class="section-title">Insights 5S</h2>
               <p class="subtitle">
-                Acompanhe a pontuação diária da turma ativa como percentual sobre 185 pontos.
+                Acompanhe o progresso diário da turma ativa no mês atual como percentual sobre 185
+                pontos.
               </p>
             </div>
 
@@ -129,27 +130,14 @@
                 label="Turma"
                 class="days-select"
               />
-
-              <q-select
-                v-model="daily5sSelectedDays"
-                outlined
-                dense
-                :options="daysOptions"
-                option-value="value"
-                option-label="label"
-                emit-value
-                map-options
-                label="Selecione o período"
-                class="days-select"
-              />
             </div>
           </div>
 
           <div class="charts-grid">
             <div class="chart-item">
               <Daily5sScoreProgressCard
+                :month-key="currentMonthKey"
                 :turma="daily5sSelectedTurma"
-                :days="daily5sSelectedDays"
                 :refresh-token="daily5sAnalyticsRefreshToken"
               />
             </div>
@@ -171,6 +159,7 @@ import RtoBoard5sCard from 'src/components/rtoBoard5s/audit/RtoBoard5sCard.vue';
 import RtoFailuresByProcessAndTurmaCard from 'src/components/rtoBoard5s/analytics/RtoFailuresByProcessAndTurmaCard.vue';
 import Board5sFailuresByProcessAndTurmaCard from 'src/components/rtoBoard5s/analytics/Board5sFailuresByProcessAndTurmaCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
+import { toDateKey } from 'src/utils/dateFormatting';
 
 const $q = useQuasar();
 const router = useRouter();
@@ -179,9 +168,9 @@ const analyticsStore = useAnalyticsStore();
 const activeTab = ref<'dailyAudit' | 'checklist5s'>('dailyAudit');
 const refreshingAnalytics = ref(false);
 const selectedDays = ref<number>(30);
-const daily5sSelectedDays = ref<number>(30);
 const daily5sSelectedTurma = ref<'A e C' | 'B e D'>('B e D');
 const daily5sAnalyticsRefreshToken = ref(0);
+const currentMonthKey = toDateKey(new Date()).slice(0, 7);
 
 const daysOptions = [
   { label: 'Últimos 7 dias', value: 7 },

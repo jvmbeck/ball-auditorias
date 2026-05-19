@@ -39,41 +39,47 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from 'vue';
+import { computed, onMounted, provide, watch } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
-import {
-  DAILY5S_MAX_SCORE,
-  fetchDaily5sScoreTrend,
-} from 'src/services/audit/analytics.daily5sScores';
-import type { Daily5sScoreTrendData } from 'src/types/audit';
+import { DAILY5S_MAX_SCORE } from 'src/services/audit/analytics.daily5sCanonical';
+import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 provide(THEME_KEY, 'light');
 
 const props = withDefaults(
   defineProps<{
+    monthKey: string;
     turma: 'A e C' | 'B e D' | null;
     refreshToken?: number;
-    days?: number;
   }>(),
   {
     refreshToken: 0,
-    days: 7,
   },
 );
 
-const loading = ref(false);
-const error = ref<string | null>(null);
-const scoreTrend = ref<Daily5sScoreTrendData>({
-  labels: [],
-  percentages: [],
-  totals: [],
-  percentagesByDate: {},
-  totalsByDate: {},
+const analyticsStore = useAnalyticsStore();
+const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
+const error = computed(() => analyticsStore.daily5sAnalyticsError);
+
+const scoreTrend = computed(() => {
+  if (!props.turma || analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
+    return {
+      labels: [],
+      percentages: [],
+      totals: [],
+      percentagesByDate: {},
+      totalsByDate: {},
+    };
+  }
+
+  return props.turma === 'A e C'
+    ? analyticsStore.daily5sMonthlyScoreTrendByTurma.ac
+    : analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
 });
 
 const turmaSubtitle = computed(() => {
@@ -81,7 +87,7 @@ const turmaSubtitle = computed(() => {
     return 'Uma turma por vez (a turma ativa do dia)';
   }
 
-  return `Turma ${props.turma} - percentual da pontuação diária sobre ${DAILY5S_MAX_SCORE}`;
+  return `Turma ${props.turma} - progresso do mês sobre ${DAILY5S_MAX_SCORE} pontos`;
 });
 
 const latestTotal = computed(() => {
@@ -177,27 +183,26 @@ const chartOption = computed(() => ({
 }));
 
 async function loadScoreTrend() {
-  if (!props.turma) {
-    error.value = null;
-    scoreTrend.value = {
-      labels: [],
-      percentages: [],
-      totals: [],
-      percentagesByDate: {},
-      totalsByDate: {},
-    };
+  if (!props.monthKey) {
     return;
   }
 
-  loading.value = true;
-  error.value = null;
+  try {
+    await analyticsStore.loadDaily5sAnalytics(props.monthKey, false);
+  } catch {
+    // Shared error state is managed by the analytics store.
+  }
+}
+
+async function refreshScoreTrend(): Promise<void> {
+  if (!props.monthKey) {
+    return;
+  }
 
   try {
-    scoreTrend.value = await fetchDaily5sScoreTrend(props.turma, props.days);
-  } catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : 'Nao foi possivel carregar pontuacoes.';
-  } finally {
-    loading.value = false;
+    await analyticsStore.loadDaily5sAnalytics(props.monthKey, true);
+  } catch {
+    // Shared error state is managed by the analytics store.
   }
 }
 
@@ -206,9 +211,16 @@ onMounted(() => {
 });
 
 watch(
-  () => [props.turma, props.days, props.refreshToken],
+  () => [props.monthKey, props.turma],
   () => {
     void loadScoreTrend();
+  },
+);
+
+watch(
+  () => props.refreshToken,
+  () => {
+    void refreshScoreTrend();
   },
 );
 </script>

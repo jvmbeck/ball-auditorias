@@ -39,3 +39,4 @@ yarn-error.log*
 # firebase cache files
 /.firebase/*
 .firebase/
+.firebase/hosting.ZGlzdFxzcGE.cache

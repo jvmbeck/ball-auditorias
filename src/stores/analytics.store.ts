@@ -1,19 +1,28 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
-  fetchDaily5sMonthlyHeatmap,
+  deriveDaily5sIssueAnalytics,
+  deriveDaily5sMonthlyHeatmap,
+  deriveDaily5sMonthlyScoreTrend,
+  deriveDaily5sTopRating1ByProcess,
+  fetchDaily5sCanonicalMonthlyData,
   fetchFailuresByProcess,
   fetchFailuresByProcessAndTurma,
   fetchFailuresOverTime,
   fetchProcessFailureRates,
 } from 'src/services/audit';
 import type {
+  Daily5sCanonicalMonthlyData,
+  Daily5sIssueAnalyticsData,
   FailuresByProcessAndTurmaData,
   FailuresByProcessData,
   FailuresOverTimeData,
   ProcessFailureRatesData,
   AuditType,
   Daily5sMonthlyHeatmapData,
+  Daily5sMonthlyScoreTrendByTurmaData,
+  Daily5sRating1ByProcessData,
+  Daily5sScoreTrendData,
 } from 'src/types/audit';
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
@@ -51,6 +60,27 @@ const EMPTY_DAILY5S_MONTHLY_HEATMAP: Daily5sMonthlyHeatmapData = {
   points: [],
 };
 
+const EMPTY_DAILY5S_SCORE_TREND: Daily5sScoreTrendData = {
+  labels: [],
+  percentages: [],
+  totals: [],
+  percentagesByDate: {},
+  totalsByDate: {},
+};
+
+const EMPTY_DAILY5S_SCORE_TRENDS_BY_TURMA: Daily5sMonthlyScoreTrendByTurmaData = {
+  monthKey: '',
+  ac: EMPTY_DAILY5S_SCORE_TREND,
+  bd: EMPTY_DAILY5S_SCORE_TREND,
+};
+
+const EMPTY_DAILY5S_CANONICAL: Daily5sCanonicalMonthlyData = {
+  monthKey: '',
+  startKey: '',
+  endKey: '',
+  rows: [],
+};
+
 function isStale(lastFetchedAt: number | null): boolean {
   if (!lastFetchedAt) {
     return true;
@@ -62,27 +92,32 @@ function isStale(lastFetchedAt: number | null): boolean {
 export const useAnalyticsStore = defineStore(
   'analytics',
   () => {
-    // ── Legacy state (for backward compatibility) ──────────────────────────────
+    // ── Core dashboard state ───────────────────────────────────────────────────
 
     const failuresOverTime = ref<FailuresOverTimeData>(EMPTY_FAILURES_OVER_TIME);
     const failuresByProcess = ref<FailuresByProcessData>(EMPTY_FAILURES_BY_PROCESS);
     const processFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
+
+    const daily5sCanonical = ref<Daily5sCanonicalMonthlyData>(EMPTY_DAILY5S_CANONICAL);
     const daily5sMonthlyHeatmap = ref<Daily5sMonthlyHeatmapData>(EMPTY_DAILY5S_MONTHLY_HEATMAP);
+    const daily5sMonthlyScoreTrendByTurma = ref<Daily5sMonthlyScoreTrendByTurmaData>(
+      EMPTY_DAILY5S_SCORE_TRENDS_BY_TURMA,
+    );
 
     const overTimeLoading = ref(false);
     const byProcessLoading = ref(false);
     const processFailureRateLoading = ref(false);
-    const daily5sMonthlyHeatmapLoading = ref(false);
+    const daily5sAnalyticsLoading = ref(false);
 
     const overTimeError = ref<string | null>(null);
     const byProcessError = ref<string | null>(null);
     const processFailureRateError = ref<string | null>(null);
-    const daily5sMonthlyHeatmapError = ref<string | null>(null);
+    const daily5sAnalyticsError = ref<string | null>(null);
 
     const overTimeLastFetchedAt = ref<number | null>(null);
     const byProcessLastFetchedAt = ref<number | null>(null);
     const processFailureRateLastFetchedAt = ref<number | null>(null);
-    const daily5sMonthlyHeatmapLastFetchedAt = ref<number | null>(null);
+    const daily5sAnalyticsLastFetchedAt = ref<number | null>(null);
     const daily5sMonthlyHeatmapMonth = ref<string | null>(null);
 
     // ── Dual-type state ───────────────────────────────────────────────────────
@@ -126,7 +161,7 @@ export const useAnalyticsStore = defineStore(
     let overTimeRequest: Promise<void> | null = null;
     let byProcessRequest: Promise<void> | null = null;
     let processFailureRateRequest: Promise<void> | null = null;
-    let daily5sMonthlyHeatmapRequest: Promise<void> | null = null;
+    let daily5sAnalyticsRequest: Promise<void> | null = null;
 
     let checklistOverTimeRequest: Promise<void> | null = null;
     let boardOverTimeRequest: Promise<void> | null = null;
@@ -137,7 +172,7 @@ export const useAnalyticsStore = defineStore(
     let checklistByProcessAndTurmaRequest: Promise<void> | null = null;
     let boardByProcessAndTurmaRequest: Promise<void> | null = null;
 
-    // ── Legacy methods (for backward compatibility) ────────────────────────
+    // ── Core dashboard methods ─────────────────────────────────────────────
 
     async function loadFailuresOverTime(force = false): Promise<void> {
       const hasCachedData = failuresOverTime.value.labels.length > 0;
@@ -443,72 +478,114 @@ export const useAnalyticsStore = defineStore(
       ]);
     }
 
-    async function loadDaily5sMonthlyHeatmap(monthKey: string, force = false): Promise<void> {
-      const hasCachedData = daily5sMonthlyHeatmap.value.processLabels.length > 0;
+    function getDaily5sIssueAnalyticsByRange(
+      startDateKey?: string,
+      endDateKey?: string,
+    ): Daily5sIssueAnalyticsData {
+      if (!daily5sCanonical.value.monthKey) {
+        return deriveDaily5sIssueAnalytics(EMPTY_DAILY5S_CANONICAL);
+      }
+
+      return deriveDaily5sIssueAnalytics(daily5sCanonical.value, startDateKey, endDateKey);
+    }
+
+    function getDaily5sTopRating1ByProcess(
+      startDateKey?: string,
+      endDateKey?: string,
+      topN = 5,
+    ): Daily5sRating1ByProcessData {
+      if (!daily5sCanonical.value.monthKey) {
+        return { labels: [], data: [], total: 0 };
+      }
+
+      return deriveDaily5sTopRating1ByProcess(
+        daily5sCanonical.value,
+        startDateKey,
+        endDateKey,
+        topN,
+      );
+    }
+
+    async function loadDaily5sAnalytics(monthKey: string, force = false): Promise<void> {
+      const hasCachedData = daily5sCanonical.value.rows.length > 0;
 
       if (
         !force &&
         hasCachedData &&
         daily5sMonthlyHeatmapMonth.value === monthKey &&
-        !isStale(daily5sMonthlyHeatmapLastFetchedAt.value)
+        !isStale(daily5sAnalyticsLastFetchedAt.value)
       ) {
         return;
       }
 
-      if (daily5sMonthlyHeatmapRequest) {
-        return daily5sMonthlyHeatmapRequest;
+      if (daily5sAnalyticsRequest) {
+        return daily5sAnalyticsRequest;
       }
 
-      daily5sMonthlyHeatmapRequest = (async () => {
-        daily5sMonthlyHeatmapLoading.value = true;
-        daily5sMonthlyHeatmapError.value = null;
+      daily5sAnalyticsRequest = (async () => {
+        daily5sAnalyticsLoading.value = true;
+        daily5sAnalyticsError.value = null;
 
         try {
-          daily5sMonthlyHeatmap.value = await fetchDaily5sMonthlyHeatmap(monthKey);
-          daily5sMonthlyHeatmapMonth.value = daily5sMonthlyHeatmap.value.monthKey;
-          daily5sMonthlyHeatmapLastFetchedAt.value = Date.now();
+          const canonical = await fetchDaily5sCanonicalMonthlyData(monthKey);
+
+          daily5sCanonical.value = canonical;
+          daily5sMonthlyHeatmap.value = deriveDaily5sMonthlyHeatmap(canonical);
+          daily5sMonthlyScoreTrendByTurma.value = {
+            monthKey: canonical.monthKey,
+            ac: deriveDaily5sMonthlyScoreTrend(canonical, 'A e C'),
+            bd: deriveDaily5sMonthlyScoreTrend(canonical, 'B e D'),
+          };
+
+          daily5sMonthlyHeatmapMonth.value = canonical.monthKey;
+          daily5sAnalyticsLastFetchedAt.value = Date.now();
         } catch (err: unknown) {
-          daily5sMonthlyHeatmapError.value =
-            err instanceof Error ? err.message : 'Unable to load Daily 5S monthly heatmap.';
+          const message =
+            err instanceof Error ? err.message : 'Unable to load Daily 5S analytics data.';
+          daily5sAnalyticsError.value = message;
           throw err;
         } finally {
-          daily5sMonthlyHeatmapLoading.value = false;
-          daily5sMonthlyHeatmapRequest = null;
+          daily5sAnalyticsLoading.value = false;
+          daily5sAnalyticsRequest = null;
         }
       })();
 
-      return daily5sMonthlyHeatmapRequest;
+      return daily5sAnalyticsRequest;
     }
 
-    async function refreshDaily5sMonthlyHeatmap(monthKey: string): Promise<void> {
-      await loadDaily5sMonthlyHeatmap(monthKey, true);
+    async function refreshDaily5sAnalytics(monthKey: string): Promise<void> {
+      await loadDaily5sAnalytics(monthKey, true);
     }
 
     return {
-      // Legacy
+      // Core dashboard + Daily5S canonical
       failuresOverTime,
       failuresByProcess,
       processFailureRates,
+      daily5sCanonical,
       daily5sMonthlyHeatmap,
+      daily5sMonthlyScoreTrendByTurma,
       overTimeLoading,
       byProcessLoading,
       processFailureRateLoading,
-      daily5sMonthlyHeatmapLoading,
+      daily5sAnalyticsLoading,
       overTimeError,
       byProcessError,
       processFailureRateError,
-      daily5sMonthlyHeatmapError,
+      daily5sAnalyticsError,
       overTimeLastFetchedAt,
       byProcessLastFetchedAt,
       processFailureRateLastFetchedAt,
-      daily5sMonthlyHeatmapLastFetchedAt,
+      daily5sAnalyticsLastFetchedAt,
       daily5sMonthlyHeatmapMonth,
       loadFailuresOverTime,
       loadFailuresByProcess,
       loadProcessFailureRates,
       refreshAllAnalytics,
-      loadDaily5sMonthlyHeatmap,
-      refreshDaily5sMonthlyHeatmap,
+      loadDaily5sAnalytics,
+      refreshDaily5sAnalytics,
+      getDaily5sIssueAnalyticsByRange,
+      getDaily5sTopRating1ByProcess,
       // Dual-type
       checklistFailuresOverTime,
       boardFailuresOverTime,
@@ -541,17 +618,19 @@ export const useAnalyticsStore = defineStore(
   },
   {
     persist: {
-      key: 'analytics-dashboard-cache-v2',
+      key: 'analytics-dashboard-cache-v3',
       pick: [
-        // Legacy
+        // Core dashboard + Daily5S canonical
         'failuresOverTime',
         'failuresByProcess',
         'processFailureRates',
         'overTimeLastFetchedAt',
         'byProcessLastFetchedAt',
         'processFailureRateLastFetchedAt',
+        'daily5sCanonical',
         'daily5sMonthlyHeatmap',
-        'daily5sMonthlyHeatmapLastFetchedAt',
+        'daily5sMonthlyScoreTrendByTurma',
+        'daily5sAnalyticsLastFetchedAt',
         'daily5sMonthlyHeatmapMonth',
         // Dual-type
         'checklistFailuresOverTime',

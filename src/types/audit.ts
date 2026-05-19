@@ -182,6 +182,25 @@ export interface Daily5sMonthlyHeatmapData {
   points: Daily5sHeatmapPoint[];
 }
 
+export interface Daily5sCanonicalRow {
+  id: string;
+  date: string;
+  turma: Daily5sTurma;
+  process: Daily5sAuditProcessKey;
+  rating: Daily5sHeatmapValue;
+  status: Exclude<AuditProcessStatus, null> | null;
+  hasIssue: boolean;
+  comment: Daily5sIssueReason | null;
+  createdAtMs: number;
+}
+
+export interface Daily5sCanonicalMonthlyData {
+  monthKey: string;
+  startKey: string;
+  endKey: string;
+  rows: Daily5sCanonicalRow[];
+}
+
 export interface Daily5sIssueAnalyticsBucket {
   key: string;
   date: string;
@@ -223,6 +242,12 @@ export interface Daily5sRating1ByProcessData {
   labels: string[];
   data: number[];
   total: number;
+}
+
+export interface Daily5sMonthlyScoreTrendByTurmaData {
+  monthKey: string;
+  ac: Daily5sScoreTrendData;
+  bd: Daily5sScoreTrendData;
 }
 
 /** Write-side shape for a single analytics record in a process-results collection. */

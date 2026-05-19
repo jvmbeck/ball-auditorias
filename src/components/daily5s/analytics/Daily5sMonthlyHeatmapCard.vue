@@ -79,8 +79,8 @@ const props = withDefaults(
 
 const analyticsStore = useAnalyticsStore();
 
-const loading = computed(() => analyticsStore.daily5sMonthlyHeatmapLoading);
-const error = computed(() => analyticsStore.daily5sMonthlyHeatmapError);
+const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
+const error = computed(() => analyticsStore.daily5sAnalyticsError);
 const heatmapState = computed(() => analyticsStore.daily5sMonthlyHeatmap);
 
 const hasData = computed(
@@ -256,7 +256,7 @@ const chartOption = computed(() => ({
 }));
 
 async function loadHeatmap(force = false): Promise<void> {
-  await analyticsStore.loadDaily5sMonthlyHeatmap(props.monthKey, force);
+  await analyticsStore.loadDaily5sAnalytics(props.monthKey, force);
 }
 
 onMounted(() => {

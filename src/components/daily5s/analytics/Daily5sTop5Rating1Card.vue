@@ -47,7 +47,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
-import type { Daily5sHeatmapPoint, Daily5sRating1ByProcessData } from 'src/types/audit';
+import type { Daily5sRating1ByProcessData } from 'src/types/audit';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 provide(THEME_KEY, 'light');
@@ -96,43 +96,16 @@ function getEffectiveRange(): { from: string; to: string } {
   return { from, to };
 }
 
-const loading = computed(() => analyticsStore.daily5sMonthlyHeatmapLoading);
-const error = computed(() => analyticsStore.daily5sMonthlyHeatmapError);
-const heatmapState = computed(() => analyticsStore.daily5sMonthlyHeatmap);
+const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
+const error = computed(() => analyticsStore.daily5sAnalyticsError);
 
 const rating1Data = computed<Daily5sRating1ByProcessData>(() => {
-  if (heatmapState.value.monthKey !== props.monthKey) {
+  if (analyticsStore.daily5sMonthlyHeatmapMonth !== props.monthKey) {
     return { labels: [], data: [], total: 0 };
   }
 
   const { from, to } = getEffectiveRange();
-  const countByProcess = new Map<string, number>();
-
-  heatmapState.value.points.forEach((point: Daily5sHeatmapPoint) => {
-    const [xIndex, yIndex, rating] = point;
-    if (rating !== 1) {
-      return;
-    }
-
-    const category = heatmapState.value.xAxisCategories[xIndex];
-    const processLabel = heatmapState.value.processLabels[yIndex];
-
-    if (!category || !processLabel || category.date < from || category.date > to) {
-      return;
-    }
-
-    countByProcess.set(processLabel, (countByProcess.get(processLabel) ?? 0) + 1);
-  });
-
-  const sorted = [...countByProcess.entries()].sort(([, a], [, b]) => b - a).slice(0, TOP_N);
-  const labels = sorted.map(([label]) => label);
-  const data = sorted.map(([, count]) => count);
-
-  return {
-    labels,
-    data,
-    total: data.reduce((sum, value) => sum + value, 0),
-  };
+  return analyticsStore.getDaily5sTopRating1ByProcess(from, to, TOP_N);
 });
 
 const BAR_COLORS = ['#d64545', '#f1853d', '#1f5d98', '#2e9f5f', '#8b5cf6'];
@@ -204,7 +177,7 @@ const chartOption = computed(() => {
 });
 
 async function loadHeatmap(force = false): Promise<void> {
-  await analyticsStore.loadDaily5sMonthlyHeatmap(props.monthKey, force);
+  await analyticsStore.loadDaily5sAnalytics(props.monthKey, force);
 }
 
 onMounted(() => {

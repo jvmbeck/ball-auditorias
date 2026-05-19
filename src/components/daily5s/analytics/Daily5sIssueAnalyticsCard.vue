@@ -132,8 +132,7 @@ import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
-import { fetchDaily5sIssueAnalytics } from 'src/services/audit/analytics.daily5sIssues';
-import type { Daily5sIssueAnalyticsData } from 'src/types/audit';
+import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
@@ -175,6 +174,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:dateRange': [range: { from: string; to: string }];
 }>();
+
+const analyticsStore = useAnalyticsStore();
 
 function getMonthKey(monthKey: string): string {
   return /^\d{4}-\d{2}$/.test(monthKey) ? monthKey : toDateKey(new Date()).slice(0, 7);
@@ -225,21 +226,28 @@ function formatRangeDisplay(range: DateRangeModel | null): string {
   return `${toDisplayDate(range.from)} - ${toDisplayDate(to)}`;
 }
 
-const baseMonthKey = getMonthKey(props.monthKey);
-const baseMonthRange = getMonthRange(baseMonthKey);
+const baseMonthKey = computed(() => getMonthKey(props.monthKey));
+const baseMonthRange = computed(() => getMonthRange(baseMonthKey.value));
 
-const loading = ref(false);
-const error = ref<string | null>(null);
+const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
+const error = computed(() => analyticsStore.daily5sAnalyticsError);
 const viewMode = ref<ViewMode>('byTurma');
 const metricMode = ref<MetricMode>('count');
-const appliedRange = ref<DateRangeModel>({ ...baseMonthRange });
-const draftRange = ref<DateRangeModel>({ ...baseMonthRange });
+const appliedRange = ref<DateRangeModel>({ ...baseMonthRange.value });
+const draftRange = ref<DateRangeModel>({ ...baseMonthRange.value });
 const rangeDisplay = computed(() => formatRangeDisplay(appliedRange.value));
-const issueAnalytics = ref<Daily5sIssueAnalyticsData>({
-  monthKey: '',
-  byTurmaTime: { labels: [], buckets: [], series: [], grandTotal: 0 },
-  overall: { labels: [], buckets: [], series: [], grandTotal: 0 },
-  byReasonAndTurma: { reasons: [], seriesAC: [], seriesBD: [], grandTotal: 0 },
+const issueAnalytics = computed(() => {
+  if (analyticsStore.daily5sMonthlyHeatmapMonth !== baseMonthKey.value) {
+    return {
+      monthKey: '',
+      byTurmaTime: { labels: [], buckets: [], series: [], grandTotal: 0 },
+      overall: { labels: [], buckets: [], series: [], grandTotal: 0 },
+      byReasonAndTurma: { reasons: [], seriesAC: [], seriesBD: [], grandTotal: 0 },
+    };
+  }
+
+  const effectiveRange = normalizeRange(appliedRange.value);
+  return analyticsStore.getDaily5sIssueAnalyticsByRange(effectiveRange.from, effectiveRange.to);
 });
 
 const turmaSeriesMeta = TURMA_SERIES_META;
@@ -258,7 +266,7 @@ function toggleTurma(key: 'AC' | 'BD'): void {
 
 function normalizeRange(range: DateRangeModel): DateRangeModel {
   if (!range?.from) {
-    return { ...baseMonthRange };
+    return { ...baseMonthRange.value };
   }
 
   const from = range.from;
@@ -282,7 +290,7 @@ function applyRange(): void {
 }
 
 function resetRange(): void {
-  draftRange.value = { ...baseMonthRange };
+  draftRange.value = { ...baseMonthRange.value };
 }
 
 function toPercentage(value: number, total: number): number {
@@ -462,23 +470,18 @@ const chartOption = computed(() => {
 });
 
 async function loadIssueAnalytics(): Promise<void> {
-  loading.value = true;
-  error.value = null;
-
   try {
-    const effectiveRange = normalizeRange(appliedRange.value);
-    const analytics = await fetchDaily5sIssueAnalytics(
-      baseMonthKey,
-      effectiveRange.from,
-      effectiveRange.to,
-    );
+    await analyticsStore.loadDaily5sAnalytics(baseMonthKey.value, false);
+  } catch {
+    // Shared error state is managed by the analytics store.
+  }
+}
 
-    issueAnalytics.value = analytics;
-  } catch (err: unknown) {
-    error.value =
-      err instanceof Error ? err.message : 'Nao foi possivel carregar as issues do mes.';
-  } finally {
-    loading.value = false;
+async function refreshIssueAnalytics(): Promise<void> {
+  try {
+    await analyticsStore.loadDaily5sAnalytics(baseMonthKey.value, true);
+  } catch {
+    // Shared error state is managed by the analytics store.
   }
 }
 
@@ -489,9 +492,22 @@ onMounted(() => {
 });
 
 watch(
-  () => [appliedRange.value.from, appliedRange.value.to, props.refreshToken],
+  () => props.monthKey,
   () => {
+    appliedRange.value = { ...baseMonthRange.value };
+    draftRange.value = { ...baseMonthRange.value };
+
     void loadIssueAnalytics();
+
+    const { from, to } = appliedRange.value;
+    emit('update:dateRange', { from, to: to ?? from });
+  },
+);
+
+watch(
+  () => props.refreshToken,
+  () => {
+    void refreshIssueAnalytics();
   },
 );
 </script>

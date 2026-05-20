@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
+  deriveDaily5sActionPlan,
   deriveDaily5sIssueAnalytics,
   deriveDaily5sMonthlyHeatmap,
   deriveDaily5sMonthlyScoreTrend,
@@ -12,6 +13,7 @@ import {
   fetchProcessFailureRates,
 } from 'src/services/audit';
 import type {
+  Daily5sActionPlanData,
   Daily5sCanonicalMonthlyData,
   Daily5sIssueAnalyticsData,
   FailuresByProcessAndTurmaData,
@@ -56,6 +58,7 @@ const EMPTY_FAILURES_BY_PROCESS_AND_TURMA: FailuresByProcessAndTurmaData = {
 const EMPTY_DAILY5S_MONTHLY_HEATMAP: Daily5sMonthlyHeatmapData = {
   monthKey: '',
   processLabels: [],
+  processKeys: [],
   xAxisCategories: [],
   points: [],
 };
@@ -506,6 +509,17 @@ export const useAnalyticsStore = defineStore(
       );
     }
 
+    function getDaily5sActionPlanByRange(
+      startDateKey?: string,
+      endDateKey?: string,
+    ): Daily5sActionPlanData {
+      if (!daily5sCanonical.value.monthKey) {
+        return { rows: [], total: 0 };
+      }
+
+      return deriveDaily5sActionPlan(daily5sCanonical.value, startDateKey, endDateKey);
+    }
+
     async function loadDaily5sAnalytics(monthKey: string, force = false): Promise<void> {
       const hasCachedData = daily5sCanonical.value.rows.length > 0;
 
@@ -586,6 +600,7 @@ export const useAnalyticsStore = defineStore(
       refreshDaily5sAnalytics,
       getDaily5sIssueAnalyticsByRange,
       getDaily5sTopRating1ByProcess,
+      getDaily5sActionPlanByRange,
       // Dual-type
       checklistFailuresOverTime,
       boardFailuresOverTime,

@@ -47,6 +47,14 @@
           :refresh-token="refreshToken"
           class="q-mt-lg"
         />
+
+        <Daily5sActionPlanTableCard
+          :month-key="selectedMonth"
+          :start-date-key="currentDateRange.from"
+          :end-date-key="currentDateRange.to"
+          :refresh-token="refreshToken"
+          class="q-mt-lg"
+        />
       </section>
     </div>
   </q-page>
@@ -55,6 +63,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import Daily5sActionPlanTableCard from 'src/components/daily5s/analytics/Daily5sActionPlanTableCard.vue';
 import Daily5sIssueAnalyticsCard from 'src/components/daily5s/analytics/Daily5sIssueAnalyticsCard.vue';
 import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
 import Daily5sTop5Rating1Card from 'src/components/daily5s/analytics/Daily5sTop5Rating1Card.vue';

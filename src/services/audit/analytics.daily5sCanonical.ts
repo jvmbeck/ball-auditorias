@@ -1,12 +1,17 @@
 import { db } from 'boot/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
+import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import {
   DAILY5S_ISSUE_REASONS,
   DAILY5S_PROCESS_DEFINITIONS,
+  DAILY5S_PROCESS_LABELS,
   isDaily5sIssueReason,
   isDaily5sProcessKey,
 } from 'src/services/audit/daily5sDefinitions';
 import type {
+  Daily5sActionPlanData,
+  Daily5sActionPlanOwner,
+  Daily5sActionPlanRow,
   Daily5sCanonicalMonthlyData,
   Daily5sCanonicalRow,
   Daily5sHeatmapCategory,
@@ -30,6 +35,13 @@ const ISSUE_REASON_COLORS: Record<Daily5sIssueReason, string> = {
   'Sujeira no Piso': '#f1c453',
   'Sujeira nas Máquinas': '#1f5d98',
   Desorganização: '#2e9f5f',
+};
+
+const ACTION_OWNER_BY_REASON: Record<Daily5sIssueReason, Daily5sActionPlanOwner> = {
+  'Latas acumuladas': 'Turma ou Cormat',
+  'Sujeira no Piso': 'Sodexo',
+  'Sujeira nas Máquinas': 'Turma ou Cormat',
+  Desorganização: 'Turma',
 };
 
 const TURMA_ORDER: Daily5sTurma[] = ['A e C', 'B e D'];
@@ -264,6 +276,7 @@ export function deriveDaily5sMonthlyHeatmap(
 ): Daily5sMonthlyHeatmapData {
   const processDefs = DAILY5S_PROCESS_DEFINITIONS;
   const processLabels = processDefs.map((definition) => definition.label);
+  const processKeys = processDefs.map((definition) => definition.key);
   const processIndexByKey = new Map(
     processDefs.map((definition, index) => [definition.key, index]),
   );
@@ -310,6 +323,7 @@ export function deriveDaily5sMonthlyHeatmap(
   return {
     monthKey: canonical.monthKey,
     processLabels,
+    processKeys,
     xAxisCategories,
     points,
   };
@@ -466,5 +480,51 @@ export function deriveDaily5sTopRating1ByProcess(
     labels: sliced.map(([label]) => label),
     data: sliced.map(([, value]) => value),
     total: sliced.reduce((sum, [, value]) => sum + value, 0),
+  };
+}
+
+export function deriveDaily5sActionPlan(
+  canonical: Daily5sCanonicalMonthlyData,
+  startDateKey?: string,
+  endDateKey?: string,
+): Daily5sActionPlanData {
+  const range = normalizeRange(canonical.monthKey, startDateKey, endDateKey);
+
+  const rows: Daily5sActionPlanRow[] = canonical.rows
+    .filter((row) => row.rating === 1 && !!row.comment)
+    .filter((row) => row.date >= range.from && row.date <= range.to)
+    .map((row) => {
+      const reason = row.comment as Daily5sIssueReason;
+      const roster = DAILY5S_PROCESS_ROSTER[row.process];
+
+      return {
+        id: row.id,
+        date: row.date,
+        turma: row.turma,
+        process: DAILY5S_PROCESS_LABELS[row.process] ?? row.process,
+        auditor: roster?.auditor || 'A definir',
+        processResponsible: roster?.responsible || 'A definir',
+        reason,
+        whoShouldAct: ACTION_OWNER_BY_REASON[reason] ?? 'Nao definido',
+      };
+    });
+
+  rows.sort((left, right) => {
+    const byDate = right.date.localeCompare(left.date);
+    if (byDate !== 0) {
+      return byDate;
+    }
+
+    const byTurma = left.turma.localeCompare(right.turma);
+    if (byTurma !== 0) {
+      return byTurma;
+    }
+
+    return left.process.localeCompare(right.process, 'pt-BR');
+  });
+
+  return {
+    rows,
+    total: rows.length,
   };
 }

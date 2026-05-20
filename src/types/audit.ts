@@ -178,6 +178,7 @@ export type Daily5sHeatmapPoint = [number, number, Daily5sHeatmapValue];
 export interface Daily5sMonthlyHeatmapData {
   monthKey: string;
   processLabels: string[];
+  processKeys: Daily5sAuditProcessKey[];
   xAxisCategories: Daily5sHeatmapCategory[];
   points: Daily5sHeatmapPoint[];
 }
@@ -241,6 +242,24 @@ export interface Daily5sIssueByReasonAndTurmaData {
 export interface Daily5sRating1ByProcessData {
   labels: string[];
   data: number[];
+  total: number;
+}
+
+export type Daily5sActionPlanOwner = 'Turma ou Cormat' | 'Sodexo' | 'Turma' | 'Nao definido';
+
+export interface Daily5sActionPlanRow {
+  id: string;
+  date: string;
+  turma: Daily5sTurma;
+  process: string;
+  auditor: string;
+  processResponsible: string;
+  reason: Daily5sIssueReason;
+  whoShouldAct: Daily5sActionPlanOwner;
+}
+
+export interface Daily5sActionPlanData {
+  rows: Daily5sActionPlanRow[];
   total: number;
 }
 

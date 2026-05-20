@@ -56,6 +56,7 @@ import {
   DataZoomComponent,
 } from 'echarts/components';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
+import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 
 use([
   CanvasRenderer,
@@ -102,7 +103,6 @@ function formatAxisLabel(categoryKey: string): string {
   const turmaTag = turma === 'A e C' ? '{ac|A/C}' : '{bd|B/D}';
   return `{day|${day}/${month}}\n${turmaTag}`;
 }
-
 function tooltipFormatter(params: unknown): string {
   const point = Array.isArray(params) ? params[0] : params;
 
@@ -117,15 +117,22 @@ function tooltipFormatter(params: unknown): string {
   const rating = typeof tuple[2] === 'number' ? tuple[2] : 0;
 
   const category = heatmapState.value.xAxisCategories[xIndex];
-  const process = heatmapState.value.processLabels[yIndex] ?? '-';
+  const processLabel = heatmapState.value.processLabels[yIndex] ?? '-';
+  const processKey = heatmapState.value.processKeys[yIndex];
 
-  if (!category) {
-    return process;
+  if (!category || !processKey) {
+    return processLabel;
   }
+
+  const rosterEntry = DAILY5S_PROCESS_ROSTER[processKey] || {
+    auditor: 'N/A',
+    backup: 'N/A',
+    responsible: 'N/A',
+  };
 
   const ratingLabel = rating === 0 ? 'Sem avaliação' : `Nota ${rating}`;
 
-  return `${category.label}<br/>${process}<br/><strong>${ratingLabel}</strong>`;
+  return `${category.label}<br/>${processLabel}<br/><strong>${ratingLabel}</strong><br/>Auditor: ${rosterEntry.auditor}<br/>Backup: ${rosterEntry.backup}<br/>Responsável: ${rosterEntry.responsible}`;
 }
 
 const chartOption = computed(() => ({

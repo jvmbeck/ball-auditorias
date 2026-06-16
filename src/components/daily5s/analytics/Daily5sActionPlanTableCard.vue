@@ -57,22 +57,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import type { QTableProps } from 'quasar';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import type { Daily5sActionPlanData } from 'src/types/audit';
 
-const props = withDefaults(
-  defineProps<{
-    monthKey: string;
-    startDateKey?: string;
-    endDateKey?: string;
-    refreshToken?: number;
-  }>(),
-  {
-    refreshToken: 0,
-  },
-);
+const props = defineProps<{
+  monthKey: string;
+  dateRange: {
+    from: string;
+    to: string;
+  };
+}>();
 
 const analyticsStore = useAnalyticsStore();
 
@@ -100,35 +96,6 @@ const columns: QTableProps['columns'] = [
   },
 ];
 
-function toMonthBounds(monthKey: string): { from: string; to: string } {
-  const valid = /^\d{4}-\d{2}$/.test(monthKey);
-  const base = valid ? `${monthKey}-01` : new Date().toISOString().slice(0, 7) + '-01';
-  const monthDate = new Date(`${base}T00:00:00`);
-  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-  const from = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-${String(monthStart.getDate()).padStart(2, '0')}`;
-  const to = `${monthEnd.getFullYear()}-${String(monthEnd.getMonth() + 1).padStart(2, '0')}-${String(monthEnd.getDate()).padStart(2, '0')}`;
-
-  return { from, to };
-}
-
-function isDateKey(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function getEffectiveRange(): { from: string; to: string } {
-  const fallback = toMonthBounds(props.monthKey);
-  let from = isDateKey(props.startDateKey) ? props.startDateKey : fallback.from;
-  let to = isDateKey(props.endDateKey) ? props.endDateKey : fallback.to;
-
-  if (from > to) {
-    [from, to] = [to, from];
-  }
-
-  return { from, to };
-}
-
 function formatDate(dateKey: string): string {
   const [year, month, day] = dateKey.split('-');
   if (!year || !month || !day) {
@@ -146,33 +113,10 @@ const actionPlanData = computed<Daily5sActionPlanData>(() => {
     return { rows: [], total: 0 };
   }
 
-  const { from, to } = getEffectiveRange();
-  return analyticsStore.getDaily5sActionPlanByRange(from, to);
+  return analyticsStore.getDaily5sActionPlanByRange(props.dateRange.from, props.dateRange.to);
 });
 
 const hasData = computed(() => actionPlanData.value.total > 0);
-
-async function loadHeatmap(force = false): Promise<void> {
-  await analyticsStore.loadDaily5sAnalytics(props.monthKey, force);
-}
-
-onMounted(() => {
-  void loadHeatmap(false);
-});
-
-watch(
-  () => props.monthKey,
-  () => {
-    void loadHeatmap(false);
-  },
-);
-
-watch(
-  () => props.refreshToken,
-  () => {
-    void loadHeatmap(true);
-  },
-);
 </script>
 
 <style scoped>

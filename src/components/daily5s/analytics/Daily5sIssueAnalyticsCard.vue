@@ -6,7 +6,7 @@
         <div>
           <div class="title">Issues do mês</div>
           <div class="subtitle">
-            {{ viewMode === 'byTurma' ? 'Por turma' : 'Total geral' }}
+            {{ viewMode === 'byTurma' ? 'Por turma' : 'Total geral' }} · {{ rangeDisplay }}
           </div>
         </div>
       </div>
@@ -35,40 +35,6 @@
               :options="metricOptions"
               class="view-toggle"
             />
-
-            <div class="date-range">
-              <q-input
-                readonly
-                outlined
-                dense
-                :model-value="rangeDisplay"
-                label="Período"
-                class="date-range-input"
-              >
-                <template #prepend>
-                  <q-icon name="event" />
-                </template>
-
-                <template #append>
-                  <q-icon name="arrow_drop_down" />
-                </template>
-
-                <q-popup-proxy
-                  cover
-                  transition-show="scale"
-                  transition-hide="scale"
-                  @before-show="syncDraftRange"
-                >
-                  <q-date v-model="draftRange" range mask="YYYY-MM-DD" minimal />
-
-                  <div class="date-actions row items-center justify-end q-pa-sm q-gutter-sm">
-                    <q-btn flat label="Limpar" color="primary" @click="resetRange" />
-                    <q-btn v-close-popup flat label="Aplicar" color="primary" @click="applyRange" />
-                    <q-btn v-close-popup flat label="Fechar" color="primary" />
-                  </div>
-                </q-popup-proxy>
-              </q-input>
-            </div>
           </div>
 
           <div class="toolbar-right">
@@ -126,14 +92,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from 'vue';
+import { computed, provide, ref } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
-import { toDateKey } from 'src/utils/dateFormatting';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 provide(THEME_KEY, 'light');
@@ -146,9 +111,9 @@ const TURMA_SERIES_META = [
 type ViewMode = 'byTurma' | 'overall';
 type MetricMode = 'count' | 'percentage';
 
-interface DateRangeModel {
+interface DateRangeValue {
   from: string;
-  to?: string;
+  to: string;
 }
 
 const viewOptions = [
@@ -161,46 +126,15 @@ const metricOptions = [
   { label: 'Percentual', value: 'percentage' },
 ];
 
-const props = withDefaults(
-  defineProps<{
-    monthKey: string;
-    refreshToken?: number;
-  }>(),
-  {
-    refreshToken: 0,
-  },
-);
-
-const emit = defineEmits<{
-  'update:dateRange': [range: { from: string; to: string }];
+const props = defineProps<{
+  monthKey: string;
+  dateRange: DateRangeValue;
 }>();
 
 const analyticsStore = useAnalyticsStore();
 
 function getMonthKey(monthKey: string): string {
-  return /^\d{4}-\d{2}$/.test(monthKey) ? monthKey : toDateKey(new Date()).slice(0, 7);
-}
-
-function getMonthRange(monthKey: string): DateRangeModel {
-  const [yearPart, monthPart] = monthKey.split('-');
-  const year = Number(yearPart);
-  const month = Number(monthPart);
-
-  if (!year || !month) {
-    const fallback = toDateKey(new Date()).slice(0, 7);
-    return {
-      from: `${fallback}-01`,
-      to: `${fallback}-28`,
-    };
-  }
-
-  const firstDay = new Date(year, month - 1, 1);
-  const lastDay = new Date(year, month, 0);
-
-  return {
-    from: toDateKey(firstDay),
-    to: toDateKey(lastDay),
-  };
+  return /^\d{4}-\d{2}$/.test(monthKey) ? monthKey : new Date().toISOString().slice(0, 7);
 }
 
 function toDisplayDate(dateKey: string): string {
@@ -212,7 +146,7 @@ function toDisplayDate(dateKey: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function formatRangeDisplay(range: DateRangeModel | null): string {
+function formatRangeDisplay(range: DateRangeValue | null): string {
   if (!range || !range.from) {
     return 'Selecione um período';
   }
@@ -227,15 +161,12 @@ function formatRangeDisplay(range: DateRangeModel | null): string {
 }
 
 const baseMonthKey = computed(() => getMonthKey(props.monthKey));
-const baseMonthRange = computed(() => getMonthRange(baseMonthKey.value));
+const rangeDisplay = computed(() => formatRangeDisplay(props.dateRange));
 
 const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
 const error = computed(() => analyticsStore.daily5sAnalyticsError);
 const viewMode = ref<ViewMode>('byTurma');
 const metricMode = ref<MetricMode>('count');
-const appliedRange = ref<DateRangeModel>({ ...baseMonthRange.value });
-const draftRange = ref<DateRangeModel>({ ...baseMonthRange.value });
-const rangeDisplay = computed(() => formatRangeDisplay(appliedRange.value));
 const issueAnalytics = computed(() => {
   if (analyticsStore.daily5sMonthlyHeatmapMonth !== baseMonthKey.value) {
     return {
@@ -246,8 +177,7 @@ const issueAnalytics = computed(() => {
     };
   }
 
-  const effectiveRange = normalizeRange(appliedRange.value);
-  return analyticsStore.getDaily5sIssueAnalyticsByRange(effectiveRange.from, effectiveRange.to);
+  return analyticsStore.getDaily5sIssueAnalyticsByRange(props.dateRange.from, props.dateRange.to);
 });
 
 const turmaSeriesMeta = TURMA_SERIES_META;
@@ -262,35 +192,6 @@ function toggleTurma(key: 'AC' | 'BD'): void {
     next.add(key);
   }
   activeKeys.value = next;
-}
-
-function normalizeRange(range: DateRangeModel): DateRangeModel {
-  if (!range?.from) {
-    return { ...baseMonthRange.value };
-  }
-
-  const from = range.from;
-  const to = range.to ?? range.from;
-
-  if (from <= to) {
-    return { from, to };
-  }
-
-  return { from: to, to: from };
-}
-
-function syncDraftRange(): void {
-  draftRange.value = { ...appliedRange.value };
-}
-
-function applyRange(): void {
-  appliedRange.value = normalizeRange(draftRange.value);
-  const { from, to } = appliedRange.value;
-  emit('update:dateRange', { from, to: to ?? from });
-}
-
-function resetRange(): void {
-  draftRange.value = { ...baseMonthRange.value };
 }
 
 function toPercentage(value: number, total: number): number {
@@ -468,48 +369,6 @@ const chartOption = computed(() => {
     ],
   };
 });
-
-async function loadIssueAnalytics(): Promise<void> {
-  try {
-    await analyticsStore.loadDaily5sAnalytics(baseMonthKey.value, false);
-  } catch {
-    // Shared error state is managed by the analytics store.
-  }
-}
-
-async function refreshIssueAnalytics(): Promise<void> {
-  try {
-    await analyticsStore.loadDaily5sAnalytics(baseMonthKey.value, true);
-  } catch {
-    // Shared error state is managed by the analytics store.
-  }
-}
-
-onMounted(() => {
-  void loadIssueAnalytics();
-  const { from, to } = appliedRange.value;
-  emit('update:dateRange', { from, to: to ?? from });
-});
-
-watch(
-  () => props.monthKey,
-  () => {
-    appliedRange.value = { ...baseMonthRange.value };
-    draftRange.value = { ...baseMonthRange.value };
-
-    void loadIssueAnalytics();
-
-    const { from, to } = appliedRange.value;
-    emit('update:dateRange', { from, to: to ?? from });
-  },
-);
-
-watch(
-  () => props.refreshToken,
-  () => {
-    void refreshIssueAnalytics();
-  },
-);
 </script>
 
 <style scoped>
@@ -552,22 +411,6 @@ watch(
 
 .view-toggle {
   min-height: 36px;
-}
-
-.date-range {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.date-range-input {
-  min-width: 280px;
-}
-
-.date-actions {
-  min-width: 280px;
-  border-top: 1px solid #e1e7ea;
 }
 
 .toolbar-right {

@@ -1,5 +1,13 @@
 import { db } from 'boot/firebase';
-import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore';
+import {
+  Timestamp,
+  collection,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import { toDateKey } from 'src/utils/dateFormatting';
 import type {
   Daily5sAuditProcessKey,
@@ -45,6 +53,57 @@ export interface Daily5sPersistedResult {
   process: Daily5sAuditProcessKey;
   rating: Daily5sRatingValue;
   comment: string;
+}
+
+export async function getTodaysDaily5sRatedProcessKeys(): Promise<Daily5sAuditProcessKey[]> {
+  const dayId = getTodayDateString();
+  const resultsQuery = query(collection(db, 'daily5sProcessResults'), where('date', '==', dayId));
+  const resultSnapshots = await getDocs(resultsQuery);
+  const processKeys = new Set<Daily5sAuditProcessKey>();
+
+  resultSnapshots.forEach((snapshot) => {
+    const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
+
+    if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
+      return;
+    }
+
+    processKeys.add(data.process);
+  });
+
+  return [...processKeys];
+}
+
+export function subscribeTodaysDaily5sRatedProcessKeys(
+  onChange: (processKeys: Daily5sAuditProcessKey[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const dayId = getTodayDateString();
+  const resultsQuery = query(collection(db, 'daily5sProcessResults'), where('date', '==', dayId));
+
+  return onSnapshot(
+    resultsQuery,
+    (resultSnapshots) => {
+      const processKeys = new Set<Daily5sAuditProcessKey>();
+
+      resultSnapshots.forEach((snapshot) => {
+        const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
+
+        if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
+          return;
+        }
+
+        processKeys.add(data.process);
+      });
+
+      onChange([...processKeys]);
+    },
+    (error) => {
+      if (onError) {
+        onError(error);
+      }
+    },
+  );
 }
 
 export async function getTodaysDaily5sStatus(

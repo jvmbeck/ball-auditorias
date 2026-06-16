@@ -2,10 +2,25 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
+    path: '/auditor',
     component: () => import('layouts/MainLayout.vue'),
-    children: [{ path: '', name: 'index', component: () => import('pages/IndexPage.vue') }],
-    meta: { requiresAuth: true },
+    children: [
+      { path: '', name: 'auditor-home', component: () => import('pages/AuditorPage.vue') },
+    ],
+    meta: { requiresAuth: true, allowedRoles: ['operator', 'admin'] },
+  },
+  {
+    path: '/admin',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      { path: '', name: 'admin-home', component: () => import('pages/AdminPage.vue') },
+      {
+        path: 'analytics',
+        name: 'analytics',
+        component: () => import('pages/AnalyticsPage.vue'),
+      },
+    ],
+    meta: { requiresAuth: true, allowedRoles: ['admin'] },
   },
   {
     path: '/audits',
@@ -22,17 +37,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('pages/Daily5sAuditPage.vue'),
       },
       {
-        path: 'daily-5s-heatmap',
-        name: 'daily5s-heatmap-page',
-        component: () => import('pages/Daily5sHeatmapPage.vue'),
-      },
-      {
         path: 'audit-history',
         name: 'audit-history',
         component: () => import('pages/AuditHistoryPage.vue'),
       },
     ],
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, allowedRoles: ['operator', 'admin'] },
   },
   {
     path: '/login',

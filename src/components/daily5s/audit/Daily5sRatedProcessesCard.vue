@@ -2,13 +2,16 @@
   <q-card flat bordered class="rated-card">
     <q-card-section>
       <div class="header q-mb-sm">
-        <q-icon name="fact_check" size="24px" color="primary" class="q-mr-sm" />
         <div>
-          <div class="title">Processos do dia</div>
+          <div>
+            <q-icon name="fact_check" size="28px" color="primary" class="q-mr-sm" />
+            <span class="title">Processos do dia</span>
+          </div>
+
           <div class="subtitle">Status de cada processo e as pessoas responsáveis.</div>
         </div>
 
-        <q-chip class="q-ml-auto" color="primary" text-color="white" icon="calendar_today">
+        <q-chip color="primary" text-color="white" icon="calendar_today" class="chip">
           {{ ratedCount }}/{{ totalCount }} avaliados
         </q-chip>
       </div>
@@ -62,14 +65,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
-import { getTodaysDaily5sStatus } from 'src/services/audit';
+import {
+  getTodaysDaily5sRatedProcessKeys,
+  subscribeTodaysDaily5sRatedProcessKeys,
+} from 'src/services/audit';
 import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit/daily5sDefinitions';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import type { QTableProps } from 'quasar';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
-import type { Daily5sTodayStatus } from 'src/services/audit/daily5sStatus';
 
 interface ProcessRow {
   key: Daily5sAuditProcessKey;
@@ -138,14 +143,13 @@ const pagination = ref({ sortBy: 'process', descending: false, rowsPerPage: 0 })
 const authStore = useAuthStore();
 const inspectorId = computed(() => authStore.firebaseUser?.uid ?? null);
 const loading = ref(false);
-const todayStatus = ref<Daily5sTodayStatus | null>(null);
+const ratedProcessKeys = ref<Daily5sAuditProcessKey[]>([]);
+const unsubscribeRealtime = ref<(() => void) | null>(null);
 
 const totalCount = computed(() => DAILY5S_PROCESS_DEFINITIONS.length);
-const ratedCount = computed(() => todayStatus.value?.ratedProcessKeys.length ?? 0);
+const ratedCount = computed(() => ratedProcessKeys.value.length);
 
-const ratedProcessKeySet = computed(
-  () => new Set<Daily5sAuditProcessKey>(todayStatus.value?.ratedProcessKeys ?? []),
-);
+const ratedProcessKeySet = computed(() => new Set<Daily5sAuditProcessKey>(ratedProcessKeys.value));
 
 const rows = computed<ProcessRow[]>(() =>
   DAILY5S_PROCESS_DEFINITIONS.map((definition) => {
@@ -165,14 +169,32 @@ const rows = computed<ProcessRow[]>(() =>
 
 async function loadRatedProcesses(): Promise<void> {
   if (!inspectorId.value) {
-    todayStatus.value = null;
+    ratedProcessKeys.value = [];
+    if (unsubscribeRealtime.value) {
+      unsubscribeRealtime.value();
+      unsubscribeRealtime.value = null;
+    }
     return;
   }
 
   loading.value = true;
 
   try {
-    todayStatus.value = await getTodaysDaily5sStatus(inspectorId.value);
+    ratedProcessKeys.value = await getTodaysDaily5sRatedProcessKeys();
+
+    if (unsubscribeRealtime.value) {
+      unsubscribeRealtime.value();
+      unsubscribeRealtime.value = null;
+    }
+
+    unsubscribeRealtime.value = subscribeTodaysDaily5sRatedProcessKeys(
+      (keys) => {
+        ratedProcessKeys.value = keys;
+      },
+      () => {
+        loading.value = false;
+      },
+    );
   } finally {
     loading.value = false;
   }
@@ -180,6 +202,13 @@ async function loadRatedProcesses(): Promise<void> {
 
 onMounted(() => {
   void loadRatedProcesses();
+});
+
+onBeforeUnmount(() => {
+  if (unsubscribeRealtime.value) {
+    unsubscribeRealtime.value();
+    unsubscribeRealtime.value = null;
+  }
 });
 
 watch(
@@ -201,8 +230,6 @@ watch(
 .rated-card {
   height: 400px;
   max-height: 400px;
-  display: flex;
-  flex-direction: column;
   border-radius: 24px;
   background: white;
   box-shadow: 0 18px 48px rgba(29, 49, 57, 0.08);
@@ -217,18 +244,24 @@ watch(
 
 .header {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+}
+
+.chip {
+  width: fit-content;
 }
 
 .title {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #17343d;
 }
 
 .subtitle {
   color: #5f7077;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  margin: 0;
+  min-height: 42px;
 }
 
 .table-shell {
@@ -287,7 +320,13 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   color: #5f7077;
+}
+
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

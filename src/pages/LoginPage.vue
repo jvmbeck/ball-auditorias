@@ -12,29 +12,39 @@
             label="Email"
             type="email"
             outlined
+            :disable="loading || resolvingAccess"
             lazy-rules
-            :rules="[(val) => !!val || 'Email is required']"
+            :rules="[
+              (val) => !!val || 'Email é obrigatório',
+              (val) => /.+@.+\..+/.test(val) || 'Email deve ser válido',
+            ]"
           />
 
           <q-input
             v-model="password"
-            label="Password"
+            label="Senha"
             type="password"
             outlined
+            :disable="loading || resolvingAccess"
             class="q-mt-md"
-            :rules="[(val) => !!val || 'Password is required']"
+            :rules="[(val) => !!val || 'Senha é obrigatória']"
           />
+
+          <div v-if="resolvingAccess" class="text-grey-7 q-mt-md">
+            Validando permissões e redirecionando...
+          </div>
 
           <div v-if="errorMessage" class="text-negative q-mt-md">
             {{ errorMessage }}
           </div>
 
           <q-btn
-            label="Login"
+            :label="resolvingAccess ? 'Redirecionando...' : 'Login'"
             type="submit"
             color="primary"
             class="full-width q-mt-lg"
-            :loading="loading"
+            :loading="loading || resolvingAccess"
+            :disable="loading || resolvingAccess"
           />
         </q-form>
       </q-card-section>
@@ -53,18 +63,39 @@ const authStore = useAuthStore();
 const email = ref('');
 const password = ref('');
 const loading = ref(false);
+const resolvingAccess = ref(false);
 const errorMessage = ref<string | null>(null);
+
+const waitForRoleResolution = async (timeoutMs = 3000) => {
+  const startedAt = Date.now();
+
+  while (!authStore.role && Date.now() - startedAt < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+};
 
 async function handleLogin() {
   loading.value = true;
+  resolvingAccess.value = false;
   errorMessage.value = null;
 
   try {
     await authStore.loginUser(email.value, password.value);
-    // Auth state listener in store will update automatically
-    void router.push('/');
+    resolvingAccess.value = true;
+    await waitForRoleResolution();
+
+    // Role can be resolved asynchronously by the auth state listener.
+    const destination = authStore.role === 'admin' ? '/admin' : '/auditor';
+    void router.push(destination);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      errorMessage.value = err.message;
+    } else {
+      errorMessage.value = 'Falha ao fazer login.';
+    }
   } finally {
     loading.value = false;
+    resolvingAccess.value = false;
   }
 }
 </script>

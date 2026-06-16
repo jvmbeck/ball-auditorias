@@ -1,13 +1,13 @@
 <template>
   <q-layout view="lHh Lpr lFf">
-    <q-header elevated>
+    <q-header elevated class="header">
       <q-toolbar>
         <q-toolbar-title>
           <q-btn
             flat
             no-caps
             dense
-            to="/"
+            :to="authstore.role === 'admin' ? '/admin' : '/auditor'"
             class="title-btn q-mt-md"
             aria-label="Ir para a página inicial"
           >

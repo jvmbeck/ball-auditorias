@@ -61,15 +61,48 @@ export default defineRouter(function (/* { store, ssrContext } */) {
     const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true);
     const guestOnly = to.matched.some((record) => record.meta.guestOnly === true);
     const isPublic = to.matched.some((record) => record.meta.public === true);
+    const allowedRoles = to.matched.reduce<string[]>((roles, record) => {
+      const routeRoles = record.meta.allowedRoles;
+      if (Array.isArray(routeRoles)) {
+        return [...roles, ...routeRoles.map(String)];
+      }
+      return roles;
+    }, []);
 
     // Block unauthenticated users from protected pages.
     if (!authStore.isAuthenticated && (requiresAuth || (!isPublic && !guestOnly))) {
       return '/login';
     }
 
-    // Block authenticated users from guest-only pages.
-    if (authStore.isAuthenticated && guestOnly) {
-      return '/';
+    if (authStore.isAuthenticated) {
+      // Redirect away from root to a role landing page.
+      if (to.path === '/') {
+        return authStore.role === 'admin' ? '/admin' : '/auditor';
+      }
+
+      // Block authenticated users from guest-only pages.
+      if (guestOnly) {
+        return authStore.role === 'admin' ? '/admin' : '/auditor';
+      }
+
+      // Enforce role-specific visibility when route declares allowed roles.
+      if (allowedRoles.length > 0) {
+        let userRole = authStore.role;
+
+        if (!userRole) {
+          // Recover from auth/profile timing races after sign-in.
+          await authStore.syncAuthState(authStore.firebaseUser);
+          userRole = authStore.role;
+
+          if (!userRole) {
+            return '/login';
+          }
+        }
+
+        if (!allowedRoles.includes(userRole)) {
+          return userRole === 'admin' ? '/admin' : '/auditor';
+        }
+      }
     }
   });
 

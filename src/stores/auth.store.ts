@@ -39,7 +39,10 @@ export const useAuthStore = defineStore('auth', () => {
     authError.value = null;
 
     try {
-      await login(email, password);
+      const userCredential = await login(email, password);
+
+      // Hydrate profile immediately so post-login redirects have role data available.
+      await syncAuthState(userCredential.user);
     } catch (err: unknown) {
       if (err instanceof Error) {
         authError.value = err.message;

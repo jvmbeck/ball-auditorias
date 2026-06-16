@@ -1,12 +1,12 @@
 <template>
   <q-card flat bordered class="checklist-card">
     <q-card-section>
-      <div class="header q-mb-md">
+      <div class="header">
         <q-icon name="task_alt" size="28px" color="secondary" class="q-mr-sm" />
         <span class="title">Auditoria diária de 5S</span>
       </div>
 
-      <p class="description q-mb-md">
+      <p class="description">
         Selecione os processos que deseja avaliar hoje e aplique notas 1, 3 ou 5 para cada área.
       </p>
 
@@ -115,7 +115,7 @@ onMounted(async () => {
 
 .description {
   color: #5f7077;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   margin: 0;
   min-height: 42px;
 }

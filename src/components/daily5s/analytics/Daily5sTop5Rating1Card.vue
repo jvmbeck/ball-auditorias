@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, watch } from 'vue';
+import { computed, provide } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -52,49 +52,16 @@ import type { Daily5sRating1ByProcessData } from 'src/types/audit';
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 provide(THEME_KEY, 'light');
 
-const props = withDefaults(
-  defineProps<{
-    monthKey: string;
-    startDateKey?: string;
-    endDateKey?: string;
-    refreshToken?: number;
-  }>(),
-  {
-    refreshToken: 0,
-  },
-);
+const props = defineProps<{
+  monthKey: string;
+  dateRange: {
+    from: string;
+    to: string;
+  };
+}>();
 
 const TOP_N = 5;
 const analyticsStore = useAnalyticsStore();
-
-function toMonthBounds(monthKey: string): { from: string; to: string } {
-  const valid = /^\d{4}-\d{2}$/.test(monthKey);
-  const base = valid ? `${monthKey}-01` : new Date().toISOString().slice(0, 7) + '-01';
-  const monthDate = new Date(`${base}T00:00:00`);
-  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-  const from = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}-${String(monthStart.getDate()).padStart(2, '0')}`;
-  const to = `${monthEnd.getFullYear()}-${String(monthEnd.getMonth() + 1).padStart(2, '0')}-${String(monthEnd.getDate()).padStart(2, '0')}`;
-
-  return { from, to };
-}
-
-function isDateKey(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function getEffectiveRange(): { from: string; to: string } {
-  const fallback = toMonthBounds(props.monthKey);
-  let from = isDateKey(props.startDateKey) ? props.startDateKey : fallback.from;
-  let to = isDateKey(props.endDateKey) ? props.endDateKey : fallback.to;
-
-  if (from > to) {
-    [from, to] = [to, from];
-  }
-
-  return { from, to };
-}
 
 const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
 const error = computed(() => analyticsStore.daily5sAnalyticsError);
@@ -104,8 +71,11 @@ const rating1Data = computed<Daily5sRating1ByProcessData>(() => {
     return { labels: [], data: [], total: 0 };
   }
 
-  const { from, to } = getEffectiveRange();
-  return analyticsStore.getDaily5sTopRating1ByProcess(from, to, TOP_N);
+  return analyticsStore.getDaily5sTopRating1ByProcess(
+    props.dateRange.from,
+    props.dateRange.to,
+    TOP_N,
+  );
 });
 
 const BAR_COLORS = ['#d64545', '#f1853d', '#1f5d98', '#2e9f5f', '#8b5cf6'];
@@ -175,28 +145,6 @@ const chartOption = computed(() => {
     ],
   };
 });
-
-async function loadHeatmap(force = false): Promise<void> {
-  await analyticsStore.loadDaily5sAnalytics(props.monthKey, force);
-}
-
-onMounted(() => {
-  void loadHeatmap(false);
-});
-
-watch(
-  () => props.monthKey,
-  () => {
-    void loadHeatmap(false);
-  },
-);
-
-watch(
-  () => props.refreshToken,
-  () => {
-    void loadHeatmap(true);
-  },
-);
 </script>
 
 <style scoped>

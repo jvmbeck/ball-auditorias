@@ -13,46 +13,81 @@
       </section>
 
       <section class="filters q-mb-lg">
-        <label class="month-input">
-          <span class="month-label">Mês</span>
-          <input v-model="selectedMonth" type="month" class="month-native" />
-        </label>
+        <div class="month-input">
+          <q-input
+            readonly
+            outlined
+            dense
+            :model-value="selectedMonthLabel"
+            label="Mês"
+            class="month-native"
+          >
+            <template #prepend>
+              <q-icon name="calendar_month" />
+            </template>
+
+            <template #append>
+              <q-icon name="arrow_drop_down" />
+            </template>
+
+            <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+              <q-date v-model="selectedMonth" view="Months" mask="YYYY-MM" minimal />
+            </q-popup-proxy>
+          </q-input>
+        </div>
 
         <q-btn outline color="primary" icon="refresh" label="Atualizar" @click="handleRefresh" />
-
-        <q-btn flat color="primary" icon="arrow_back" label="Voltar" @click="goBack" />
       </section>
 
-      <Daily5sMonthlyHeatmapCard :month-key="selectedMonth" :refresh-token="refreshToken" />
+      <Daily5sMonthlyHeatmapCard />
 
       <section class="issues-section q-mt-xl">
         <div class="section-header q-mb-md">
           <p class="section-eyebrow">Nova camada de análise</p>
-          <h2 class="section-title">Issues Daily 5S</h2>
+          <h2 class="section-title">Ocorrências Daily 5S</h2>
           <p class="section-subtitle">
             Explore os motivos de nota 1 por turma e ao longo do mês, com comparação ao total geral.
           </p>
         </div>
 
-        <Daily5sIssueAnalyticsCard
-          :month-key="selectedMonth"
-          :refresh-token="refreshToken"
-          @update:date-range="onDateRangeUpdate"
-        />
+        <section class="filters q-mb-lg">
+          <div class="month-input">
+            <q-input
+              readonly
+              outlined
+              dense
+              :model-value="selectedMonthLabel"
+              label="Mês"
+              class="month-native"
+            >
+              <template #prepend>
+                <q-icon name="calendar_month" />
+              </template>
+
+              <template #append>
+                <q-icon name="arrow_drop_down" />
+              </template>
+
+              <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                <q-date v-model="selectedMonth" view="Months" mask="YYYY-MM" minimal />
+              </q-popup-proxy>
+            </q-input>
+          </div>
+
+          <q-btn outline color="primary" icon="refresh" label="Atualizar" @click="handleRefresh" />
+        </section>
+
+        <Daily5sIssueAnalyticsCard :month-key="selectedMonth" :date-range="currentDateRange" />
 
         <Daily5sTop5Rating1Card
           :month-key="selectedMonth"
-          :start-date-key="currentDateRange.from"
-          :end-date-key="currentDateRange.to"
-          :refresh-token="refreshToken"
+          :date-range="currentDateRange"
           class="q-mt-lg"
         />
 
         <Daily5sActionPlanTableCard
           :month-key="selectedMonth"
-          :start-date-key="currentDateRange.from"
-          :end-date-key="currentDateRange.to"
-          :refresh-token="refreshToken"
+          :date-range="currentDateRange"
           class="q-mt-lg"
         />
       </section>
@@ -61,12 +96,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch } from 'vue';
 import Daily5sActionPlanTableCard from 'src/components/daily5s/analytics/Daily5sActionPlanTableCard.vue';
 import Daily5sIssueAnalyticsCard from 'src/components/daily5s/analytics/Daily5sIssueAnalyticsCard.vue';
 import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
 import Daily5sTop5Rating1Card from 'src/components/daily5s/analytics/Daily5sTop5Rating1Card.vue';
+import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { toDateKey } from 'src/utils/dateFormatting';
 
 function getCurrentMonthKey(): string {
@@ -86,22 +121,36 @@ function getMonthDefaultRange(monthKey: string): { from: string; to: string } {
   return { from, to };
 }
 
-const router = useRouter();
-const selectedMonth = ref(getCurrentMonthKey());
-const refreshToken = ref(0);
-const currentDateRange = ref(getMonthDefaultRange(selectedMonth.value));
+function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split('-');
 
-function onDateRangeUpdate(range: { from: string; to: string }): void {
-  currentDateRange.value = range;
+  if (!year || !month) {
+    return monthKey;
+  }
+
+  return `${month}/${year}`;
+}
+
+const analyticsStore = useAnalyticsStore();
+const selectedMonth = ref(getCurrentMonthKey());
+const selectedMonthLabel = computed(() => formatMonthLabel(selectedMonth.value));
+const currentDateRange = computed(() => getMonthDefaultRange(selectedMonth.value));
+
+async function loadMonthlyAnalytics(force = false): Promise<void> {
+  await analyticsStore.loadDaily5sAnalytics(selectedMonth.value, force);
 }
 
 function handleRefresh(): void {
-  refreshToken.value += 1;
+  void loadMonthlyAnalytics(true);
 }
 
-function goBack(): void {
-  void router.push({ name: 'index' });
-}
+watch(
+  selectedMonth,
+  () => {
+    void loadMonthlyAnalytics(false);
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>
@@ -156,25 +205,11 @@ function goBack(): void {
 
 .month-input {
   min-width: 210px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.month-label {
-  color: #4d5f66;
-  font-size: 0.82rem;
-  font-weight: 600;
 }
 
 .month-native {
   min-height: 40px;
-  border: 1px solid #c4d1d9;
-  border-radius: 8px;
-  padding: 0 12px;
-  background: #ffffff;
-  color: #17343d;
-  font-size: 0.95rem;
+  width: 100%;
 }
 
 @media (max-width: 768px) {

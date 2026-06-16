@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, watch } from 'vue';
+import { computed, provide } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -67,16 +67,6 @@ use([
   DataZoomComponent,
 ]);
 provide(THEME_KEY, 'light');
-
-const props = withDefaults(
-  defineProps<{
-    monthKey: string;
-    refreshToken?: number;
-  }>(),
-  {
-    refreshToken: 0,
-  },
-);
 
 const analyticsStore = useAnalyticsStore();
 
@@ -261,28 +251,6 @@ const chartOption = computed(() => ({
     },
   ],
 }));
-
-async function loadHeatmap(force = false): Promise<void> {
-  await analyticsStore.loadDaily5sAnalytics(props.monthKey, force);
-}
-
-onMounted(() => {
-  void loadHeatmap(false);
-});
-
-watch(
-  () => props.monthKey,
-  () => {
-    void loadHeatmap(false);
-  },
-);
-
-watch(
-  () => props.refreshToken,
-  () => {
-    void loadHeatmap(true);
-  },
-);
 </script>
 
 <style scoped>

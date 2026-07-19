@@ -10,6 +10,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type {
   AuditServiceConfig,
+  Daily5sIssueReason,
   Daily5sRatingValue,
   DualAuditProcessKey,
   DualTypeAuditDocument,
@@ -24,9 +25,11 @@ interface UpdateProcessOptions {
   printerChecks?: PrinterChecks;
   printerFiles?: Partial<Record<PrinterCheckKey, File[] | null>>;
   rating?: Daily5sRatingValue;
+  grade1Reason?: Daily5sIssueReason | null;
+  grade1Comment?: string | null;
 }
 
-function normalizeImageUrls(imageUrls: unknown, imageUrl: unknown): string[] {
+function normalizeImageUrls(imageUrls: unknown): string[] {
   const normalized = new Set<string>();
 
   if (Array.isArray(imageUrls)) {
@@ -37,11 +40,91 @@ function normalizeImageUrls(imageUrls: unknown, imageUrl: unknown): string[] {
     });
   }
 
-  if (typeof imageUrl === 'string' && imageUrl.length > 0) {
-    normalized.add(imageUrl);
-  }
-
   return [...normalized];
+}
+
+async function supportsWebP(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+
+    if (typeof canvas.toBlob !== 'function') {
+      resolve(false);
+      return;
+    }
+
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.toBlob(
+      (blob) => {
+        resolve(blob?.type === 'image/webp');
+      },
+      'image/webp',
+      0.8,
+    );
+  });
+}
+
+async function resizeAndConvertImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      try {
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+
+        if (!sourceWidth || !sourceHeight) {
+          reject(new Error('Invalid image size.'));
+          return;
+        }
+
+        const maxDimension = 1920;
+        const longestSide = Math.max(sourceWidth, sourceHeight);
+        const scale = longestSide > maxDimension ? maxDimension / longestSide : 1;
+
+        const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+        const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+          reject(new Error('Failed to create canvas context.'));
+          return;
+        }
+
+        context.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Failed to convert image to WebP.'));
+              return;
+            }
+
+            resolve(blob);
+          },
+          'image/webp',
+          0.8,
+        );
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image for processing.'));
+    };
+
+    image.src = objectUrl;
+  });
 }
 
 /**
@@ -85,12 +168,10 @@ export function createAuditService(config: AuditServiceConfig) {
   /**
    * Creates a new audit document.
    *
-   * Uses the provided audit ID as the document ID. The optional session ID can
-   * remain stable across multiple audit documents from the same day.
+   * Uses the provided audit ID as the document ID.
    *
    * @param auditId Unique audit document identifier
    * @param date Date string in YYYY-MM-DD format
-   * @param auditSessionId Stable day/session identifier used to group related audits
    * @param inspector User ID of the inspector
    * @returns Document ID
    */
@@ -99,10 +180,8 @@ export function createAuditService(config: AuditServiceConfig) {
     date: string,
     turma: 'A e C' | 'B e D',
     inspector: string,
-    auditSessionId = date,
   ): Promise<string> {
     const payload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } = {
-      auditSessionId,
       date,
       turma,
       inspector,
@@ -122,7 +201,7 @@ export function createAuditService(config: AuditServiceConfig) {
    * Uploads images to Storage if provided.
    *
    * @param auditId Audit document identifier
-   * @param auditSessionId Stable day/session identifier
+   * @param auditDate Canonical audit day in YYYY-MM-DD format
    * @param processKey Process to update
    * @param status Process status
    * @param comment Optional comment
@@ -130,7 +209,7 @@ export function createAuditService(config: AuditServiceConfig) {
    */
   async function updateProcess(
     auditId: string,
-    auditSessionId: string,
+    auditDate: string,
     turma: 'A e C' | 'B e D',
     processKey: DualAuditProcessKey,
     status: UpdatableProcessStatus,
@@ -145,14 +224,31 @@ export function createAuditService(config: AuditServiceConfig) {
       ? (existingResultSnapshot.data() as Partial<DualTypeAuditResultDocument>)
       : null;
 
-    let processImageUrls = normalizeImageUrls(existingResult?.imageUrls, existingResult?.imageUrl);
+    let processImageUrls = normalizeImageUrls(existingResult?.imageUrls);
     let printerChecks = options?.printerChecks ?? null;
+    const webpSupported = await supportsWebP();
 
     // Upload process images, preserving previous ones.
     if (status === 'not_updated' && imageFiles?.length) {
-      const uploadedImageUrls = await Promise.all(
-        imageFiles.map((file) => uploadImage(auditId, processKey, file)),
-      );
+      const uploadedImageUrls: string[] = [];
+
+      for (const file of imageFiles) {
+        try {
+          const processed = webpSupported ? await resizeAndConvertImage(file) : file;
+          const uploadFile =
+            processed instanceof File
+              ? processed
+              : new File([processed], `${file.name.replace(/\.[^/.]+$/, '')}.webp`, {
+                  type: 'image/webp',
+                });
+
+          uploadedImageUrls.push(await uploadImage(auditId, processKey, uploadFile));
+        } catch (error) {
+          console.error('Image processing failed, uploading original file', error);
+          uploadedImageUrls.push(await uploadImage(auditId, processKey, file));
+        }
+      }
+
       processImageUrls = [...processImageUrls, ...uploadedImageUrls];
     }
 
@@ -166,45 +262,60 @@ export function createAuditService(config: AuditServiceConfig) {
         [PrinterCheckKey, PrinterChecks[PrinterCheckKey]]
       >;
 
-      const uploadedPrinterChecks = await Promise.all(
-        printerEntries.map(async ([printerKey, printerCheck]) => {
-          const printerFiles = options.printerFiles?.[printerKey] ?? null;
+      const uploadedPrinterChecks: Array<[PrinterCheckKey, PrinterChecks[PrinterCheckKey]]> = [];
 
-          const existingImageUrls = normalizeImageUrls(
-            existingPrinterChecks?.[printerKey]?.imageUrls,
-            existingPrinterChecks?.[printerKey]?.imageUrl,
-          );
+      for (const [printerKey, printerCheck] of printerEntries) {
+        const printerFiles = options.printerFiles?.[printerKey] ?? null;
 
-          if (printerCheck.status === 'not_updated') {
-            const uploadedImageUrls = printerFiles?.length
-              ? await Promise.all(
-                  printerFiles.map((printerFile) =>
-                    uploadImage(auditId, processKey, printerFile, printerKey),
-                  ),
-                )
-              : [];
-            const mergedImageUrls = [...existingImageUrls, ...uploadedImageUrls];
+        const existingImageUrls = normalizeImageUrls(
+          existingPrinterChecks?.[printerKey]?.imageUrls,
+        );
 
-            return [
-              printerKey,
-              {
-                ...printerCheck,
-                imageUrl: mergedImageUrls[0] ?? null,
-                imageUrls: mergedImageUrls,
-              },
-            ] as const;
+        if (printerCheck.status === 'not_updated') {
+          const uploadedImageUrls: string[] = [];
+
+          if (printerFiles?.length) {
+            for (const printerFile of printerFiles) {
+              try {
+                const processed = webpSupported
+                  ? await resizeAndConvertImage(printerFile)
+                  : printerFile;
+                const uploadFile =
+                  processed instanceof File
+                    ? processed
+                    : new File([processed], `${printerFile.name.replace(/\.[^/.]+$/, '')}.webp`, {
+                        type: 'image/webp',
+                      });
+
+                uploadedImageUrls.push(
+                  await uploadImage(auditId, processKey, uploadFile, printerKey),
+                );
+              } catch (error) {
+                console.error('Image processing failed, uploading original file', error);
+                uploadedImageUrls.push(
+                  await uploadImage(auditId, processKey, printerFile, printerKey),
+                );
+              }
+            }
           }
 
-          return [
+          uploadedPrinterChecks.push([
             printerKey,
             {
               ...printerCheck,
-              imageUrl: null,
+              imageUrls: [...existingImageUrls, ...uploadedImageUrls],
+            },
+          ]);
+        } else {
+          uploadedPrinterChecks.push([
+            printerKey,
+            {
+              ...printerCheck,
               imageUrls: [],
             },
-          ] as const;
-        }),
-      );
+          ]);
+        }
+      }
 
       printerChecks = Object.fromEntries(uploadedPrinterChecks) as PrinterChecks;
     }
@@ -215,13 +326,12 @@ export function createAuditService(config: AuditServiceConfig) {
       >;
       const normalizedPrinterChecks = Object.fromEntries(
         printerEntries.map(([printerKey, printerCheck]) => {
-          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls, printerCheck.imageUrl);
+          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls);
 
           return [
             printerKey,
             {
               ...printerCheck,
-              imageUrl: normalizedUrls[0] ?? null,
               imageUrls: normalizedUrls,
             },
           ];
@@ -237,13 +347,12 @@ export function createAuditService(config: AuditServiceConfig) {
       >;
       const normalizedPrinterChecks = Object.fromEntries(
         printerEntries.map(([printerKey, printerCheck]) => {
-          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls, printerCheck.imageUrl);
+          const normalizedUrls = normalizeImageUrls(printerCheck.imageUrls);
 
           return [
             printerKey,
             {
               ...printerCheck,
-              imageUrl: normalizedUrls[0] ?? null,
               imageUrls: normalizedUrls,
             },
           ];
@@ -253,28 +362,37 @@ export function createAuditService(config: AuditServiceConfig) {
       printerChecks = normalizedPrinterChecks;
     }
 
-    const normalizedProcessImageUrls = normalizeImageUrls(processImageUrls, null);
+    const normalizedProcessImageUrls = normalizeImageUrls(processImageUrls);
 
-    // Determine if this process has an issue
     const hasIssue = status === 'not_updated';
+    const normalizedComment = hasIssue ? comment?.trim() || null : null;
+    const normalizedGrade1Reason = hasIssue ? (options?.grade1Reason ?? null) : null;
+    const normalizedGrade1Comment = hasIssue ? options?.grade1Comment?.trim() || null : null;
 
-    // Create result document
-    const resultPayload: DualTypeAuditResultDocument = {
+    const resultPayloadBase: DualTypeAuditResultDocument = {
       auditId,
-      auditSessionId,
-      date: auditSessionId,
+      date: auditDate,
       turma,
       process: processKey,
       status,
-      hasIssue,
       rating: options?.rating ?? null,
-      comment: hasIssue ? comment?.trim() || null : null,
-      imageUrl: hasIssue ? (normalizedProcessImageUrls[0] ?? null) : null,
       imageUrls: hasIssue ? normalizedProcessImageUrls : [],
-      printerChecks,
-      issueTargets: options?.issueTargets ?? [],
       createdAt: serverTimestamp(),
     };
+
+    const resultPayload: DualTypeAuditResultDocument =
+      config.resultsCollection === 'daily5sProcessResults'
+        ? {
+            ...resultPayloadBase,
+            grade1Reason: normalizedGrade1Reason,
+            grade1Comment: normalizedGrade1Comment,
+          }
+        : {
+            ...resultPayloadBase,
+            comment: normalizedComment,
+            printerChecks,
+            issueTargets: options?.issueTargets ?? [],
+          };
 
     await setDoc(resultRef, resultPayload, { merge: true });
   }

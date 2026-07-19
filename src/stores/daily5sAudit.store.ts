@@ -7,6 +7,7 @@ import {
   getDaily5sResultsForAudit,
   getTodaysDaily5sStatus,
 } from 'src/services/audit';
+import { isDaily5sIssueReason } from 'src/services/audit/daily5sDefinitions';
 import type {
   Daily5sAuditProcessKey,
   Daily5sRatingValue,
@@ -15,7 +16,8 @@ import type {
 
 interface Daily5sProcessEntry {
   rating: Daily5sRatingValue | null;
-  comment: string;
+  grade1Reason: string;
+  grade1Comment: string;
 }
 
 type Daily5sProcessState = Record<Daily5sAuditProcessKey, Daily5sProcessEntry>;
@@ -42,7 +44,7 @@ function createDaily5sAuditId(dayId: string): string {
 
 function buildInitialProcessState(): Daily5sProcessState {
   return DAILY5S_KEYS.reduce((acc, key) => {
-    acc[key] = { rating: null, comment: '' };
+    acc[key] = { rating: null, grade1Reason: '', grade1Comment: '' };
     return acc;
   }, {} as Daily5sProcessState);
 }
@@ -103,7 +105,7 @@ export const useDaily5sAuditStore = defineStore(
         if (!entry || entry.rating === null) {
           return false;
         }
-        const { rating, comment } = entry;
+        const { rating, grade1Reason } = entry;
         if (rating === null) {
           return false;
         }
@@ -112,13 +114,13 @@ export const useDaily5sAuditStore = defineStore(
           return true;
         }
 
-        return Boolean(comment.trim()) && processFiles[key].length > 0;
+        return Boolean(grade1Reason.trim()) && processFiles[key].length > 0;
       });
     });
 
     function clearProcessStates(): void {
       DAILY5S_KEYS.forEach((key) => {
-        processState[key] = { rating: null, comment: '' };
+        processState[key] = { rating: null, grade1Reason: '', grade1Comment: '' };
         processFiles[key] = [];
         savedProcesses[key] = false;
       });
@@ -184,7 +186,8 @@ export const useDaily5sAuditStore = defineStore(
       persisted.forEach((result) => {
         processState[result.process] = {
           rating: result.rating,
-          comment: result.comment,
+          grade1Reason: result.grade1Reason,
+          grade1Comment: result.grade1Comment,
         };
         processFiles[result.process] = [];
         savedProcesses[result.process] = true;
@@ -200,6 +203,11 @@ export const useDaily5sAuditStore = defineStore(
       if (!auditorId) {
         return;
       }
+
+      // The audit page should always start with no visible process cards.
+      // Users choose processes each time they open the page.
+      selectedProcessKeys.value = [];
+      clearProcessStates();
 
       discardStaleDraftIfNeeded();
 
@@ -259,7 +267,6 @@ export const useDaily5sAuditStore = defineStore(
         today,
         turma.value,
         auditorId,
-        today,
       );
 
       auditId.value = createdAuditId;
@@ -274,17 +281,22 @@ export const useDaily5sAuditStore = defineStore(
         throw new Error('Selecione o processo antes de salvar a avaliacao.');
       }
 
-      const { rating, comment } = processState[processKey];
+      const { rating, grade1Reason, grade1Comment } = processState[processKey];
       if (rating === null) {
         throw new Error('Selecione uma nota (1, 3 ou 5) para salvar o processo.');
       }
 
-      const trimmedComment = comment.trim();
+      const trimmedReason = grade1Reason.trim();
+      const trimmedGrade1Comment = grade1Comment.trim();
       const files = processFiles[processKey];
 
       if (rating === 1) {
-        if (!trimmedComment) {
-          throw new Error('Descricao obrigatoria para nota 1.');
+        if (!trimmedReason) {
+          throw new Error('Motivo obrigatorio para nota 1.');
+        }
+
+        if (!isDaily5sIssueReason(trimmedReason)) {
+          throw new Error('Motivo invalido para nota 1.');
         }
 
         if (!files.length) {
@@ -300,9 +312,13 @@ export const useDaily5sAuditStore = defineStore(
         turma.value as 'A e C' | 'B e D',
         processKey,
         toStatus(rating),
-        rating === 1 ? trimmedComment : null,
+        null,
         rating === 1 ? files : null,
-        { rating },
+        {
+          rating,
+          grade1Reason: rating === 1 && isDaily5sIssueReason(trimmedReason) ? trimmedReason : null,
+          grade1Comment: rating === 1 ? trimmedGrade1Comment || null : null,
+        },
       );
 
       processFiles[processKey] = [];
@@ -417,13 +433,10 @@ export const useDaily5sAuditStore = defineStore(
   },
   {
     persist: {
-      key: 'daily-5s-audit-form-draft-v4',
+      key: 'daily-5s-audit-form-draft-v5',
       pick: [
         'auditId',
         'turma',
-        'selectedProcessKeys',
-        'processState',
-        'savedProcesses',
         'draftDate',
         'draftAuditorId',
         'draftCompleted',

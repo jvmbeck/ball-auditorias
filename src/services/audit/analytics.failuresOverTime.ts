@@ -39,9 +39,9 @@ export async function fetchFailuresOverTime(type?: AuditType): Promise<FailuresO
   const snapshots = await getDocs(resultsQuery);
 
   snapshots.forEach((snapshot) => {
-    const data = snapshot.data() as Partial<{ date: unknown; hasIssue: unknown }>;
+    const data = snapshot.data() as Partial<{ date: unknown; status: unknown }>;
     const date = typeof data.date === 'string' ? data.date : null;
-    const hasIssue = data.hasIssue === true;
+    const hasIssue = data.status === 'not_updated';
 
     if (!date || !hasIssue) {
       return;

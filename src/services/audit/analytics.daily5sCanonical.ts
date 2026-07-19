@@ -237,7 +237,7 @@ export async function fetchDaily5sCanonicalMonthlyData(
       process: unknown;
       rating: unknown;
       status: unknown;
-      hasIssue: unknown;
+      grade1Reason: unknown;
       comment: unknown;
       createdAt: unknown;
     }>;
@@ -250,15 +250,24 @@ export async function fetchDaily5sCanonicalMonthlyData(
       return;
     }
 
+    const normalizedStatus =
+      data.status === 'updated' || data.status === 'not_updated' ? data.status : null;
+
+    const reason = isDaily5sIssueReason(data.grade1Reason)
+      ? data.grade1Reason
+      : isDaily5sIssueReason(data.comment)
+        ? data.comment
+        : null;
+
     rows.push({
       id: snapshot.id,
       date,
       turma,
       process,
       rating: normalizeRating(data.rating, data.status),
-      status: data.status === 'updated' || data.status === 'not_updated' ? data.status : null,
-      hasIssue: data.hasIssue === true,
-      comment: isDaily5sIssueReason(data.comment) ? data.comment : null,
+      status: normalizedStatus,
+      hasIssue: normalizedStatus === 'not_updated',
+      comment: reason,
       createdAtMs: getTimestampMs(data.createdAt),
     });
   });

@@ -85,7 +85,6 @@ export type AuditProcessStatus = 'updated' | 'not_updated' | null;
 export interface PrinterCheckResult {
   status: AuditProcessStatus;
   comment?: string | null;
-  imageUrl?: string | null;
   imageUrls?: string[] | null;
 }
 
@@ -298,7 +297,6 @@ export type UpdatableProcessStatus = Exclude<AuditProcessStatus, null>;
  * Uses date as document ID.
  */
 export interface DualTypeAuditDocument {
-  auditSessionId: string;
   date: string; // YYYY-MM-DD
   turma: 'A e C' | 'B e D';
   completedAt?: Timestamp;
@@ -312,15 +310,14 @@ export interface DualTypeAuditDocument {
  */
 export interface DualTypeAuditResultDocument {
   auditId: string; // date string (YYYY-MM-DD)
-  auditSessionId: string;
   date: string; // YYYY-MM-DD
   turma: 'A e C' | 'B e D';
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
-  hasIssue: boolean; // status === 'not_updated'
   rating?: Daily5sRatingValue | null;
+  grade1Reason?: Daily5sIssueReason | null;
+  grade1Comment?: string | null;
   comment?: string | null;
-  imageUrl?: string | null;
   imageUrls?: string[] | null;
   printerChecks?: PrinterChecks | null;
   issueTargets?: PrinterCheckKey[];

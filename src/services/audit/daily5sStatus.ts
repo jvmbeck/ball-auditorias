@@ -15,7 +15,7 @@ import type {
   DualTypeAuditDocument,
   DualTypeAuditResultDocument,
 } from 'src/types/audit';
-import { isDaily5sProcessKey } from './daily5sDefinitions';
+import { isDaily5sIssueReason, isDaily5sProcessKey } from './daily5sDefinitions';
 
 function getTodayDateString(): string {
   return toDateKey(new Date());
@@ -52,7 +52,28 @@ export interface Daily5sTodayStatus {
 export interface Daily5sPersistedResult {
   process: Daily5sAuditProcessKey;
   rating: Daily5sRatingValue;
-  comment: string;
+  grade1Reason: string;
+  grade1Comment: string;
+}
+
+function normalizeGrade1Reason(result: Partial<DualTypeAuditResultDocument>): string {
+  const reason = result.grade1Reason;
+
+  if (typeof reason === 'string' && isDaily5sIssueReason(reason)) {
+    return reason;
+  }
+
+  const legacyComment = result.comment;
+  if (typeof legacyComment === 'string' && isDaily5sIssueReason(legacyComment)) {
+    return legacyComment;
+  }
+
+  return '';
+}
+
+function normalizeGrade1Comment(result: Partial<DualTypeAuditResultDocument>): string {
+  const value = result.grade1Comment;
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 export async function getTodaysDaily5sRatedProcessKeys(): Promise<Daily5sAuditProcessKey[]> {
@@ -113,7 +134,7 @@ export async function getTodaysDaily5sStatus(
   const auditsQuery = query(
     collection(db, 'daily5sAudits'),
     where('inspector', '==', inspectorId),
-    where('auditSessionId', '==', dayId),
+    where('date', '==', dayId),
   );
   const auditsSnapshot = await getDocs(auditsQuery);
 
@@ -202,7 +223,8 @@ export async function getDaily5sResultsForAudit(
     results.push({
       process: data.process,
       rating: normalizeRating(data.rating, data.status),
-      comment: data.comment?.trim() ?? '',
+      grade1Reason: normalizeGrade1Reason(data),
+      grade1Comment: normalizeGrade1Comment(data),
     });
   });
 

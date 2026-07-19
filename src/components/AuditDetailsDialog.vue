@@ -31,7 +31,7 @@
             <q-item-section>
               <q-item-label class="process-title">{{ process.label }}</q-item-label>
               <q-item-label caption>
-                {{ getProcessExplanation(getProcessResult(process.key)?.comment) }}
+                {{ getProcessExplanation(getProcessResult(process.key)) }}
               </q-item-label>
             </q-item-section>
 
@@ -117,21 +117,9 @@ function getProcessImageUrls(processKey: string): string[] {
     return [];
   }
 
-  const urls = new Set<string>();
-
-  if (Array.isArray(result.imageUrls)) {
-    result.imageUrls.forEach((url) => {
-      if (typeof url === 'string' && url.length > 0) {
-        urls.add(url);
-      }
-    });
-  }
-
-  if (typeof result.imageUrl === 'string' && result.imageUrl.length > 0) {
-    urls.add(result.imageUrl);
-  }
-
-  return [...urls];
+  return Array.isArray(result.imageUrls)
+    ? result.imageUrls.filter((url): url is string => typeof url === 'string' && url.length > 0)
+    : [];
 }
 
 const isOpen = computed({
@@ -187,9 +175,27 @@ function getProcessChipColor(result: DualTypeAuditResultDocument | undefined): s
   return 'grey-6';
 }
 
-function getProcessExplanation(comment: string | null | undefined): string {
-  const trimmed = comment?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : 'Nenhuma explicação fornecida.';
+function getProcessExplanation(result: DualTypeAuditResultDocument | undefined): string {
+  if (!result) {
+    return 'Nenhuma explicação fornecida.';
+  }
+
+  const reason = result.grade1Reason?.trim() || result.comment?.trim() || '';
+  const detail = result.grade1Comment?.trim() || '';
+
+  if (reason && detail) {
+    return `${reason} - ${detail}`;
+  }
+
+  if (reason) {
+    return reason;
+  }
+
+  if (detail) {
+    return detail;
+  }
+
+  return 'Nenhuma explicação fornecida.';
 }
 
 function getClipboardLine(processKey: string, label: string): string {
@@ -200,7 +206,9 @@ function getClipboardLine(processKey: string, label: string): string {
     return `- ${label} - ⚪ Nao registrado${turmaSuffix}`;
   }
 
-  const explanation = process.comment?.trim();
+  const reason = process.grade1Reason?.trim() || process.comment?.trim() || '';
+  const detail = process.grade1Comment?.trim() || '';
+  const explanation = reason && detail ? `${reason} - ${detail}` : reason || detail;
 
   if (process.rating === 1 || process.rating === 3 || process.rating === 5) {
     const icon = process.rating === 1 ? '🔴' : process.rating === 3 ? '🟡' : '🟢';

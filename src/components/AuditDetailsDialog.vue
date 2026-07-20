@@ -175,12 +175,34 @@ function getProcessChipColor(result: DualTypeAuditResultDocument | undefined): s
   return 'grey-6';
 }
 
+function formatGrade1Reason(
+  grade1Reason: unknown,
+  legacyComment: string | null | undefined,
+): string {
+  if (typeof grade1Reason === 'string') {
+    return grade1Reason.trim();
+  }
+
+  if (Array.isArray(grade1Reason)) {
+    const normalized = grade1Reason
+      .filter((reason) => typeof reason === 'string')
+      .map((reason) => reason.trim())
+      .filter((reason) => reason.length > 0);
+
+    if (normalized.length > 0) {
+      return normalized.join(', ');
+    }
+  }
+
+  return legacyComment?.trim() || '';
+}
+
 function getProcessExplanation(result: DualTypeAuditResultDocument | undefined): string {
   if (!result) {
     return 'Nenhuma explicação fornecida.';
   }
 
-  const reason = result.grade1Reason?.trim() || result.comment?.trim() || '';
+  const reason = formatGrade1Reason(result.grade1Reason, result.comment);
   const detail = result.grade1Comment?.trim() || '';
 
   if (reason && detail) {
@@ -206,7 +228,7 @@ function getClipboardLine(processKey: string, label: string): string {
     return `- ${label} - ⚪ Nao registrado${turmaSuffix}`;
   }
 
-  const reason = process.grade1Reason?.trim() || process.comment?.trim() || '';
+  const reason = formatGrade1Reason(process.grade1Reason, process.comment);
   const detail = process.grade1Comment?.trim() || '';
   const explanation = reason && detail ? `${reason} - ${detail}` : reason || detail;
 

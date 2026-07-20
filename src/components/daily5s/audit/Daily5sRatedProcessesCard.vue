@@ -5,10 +5,10 @@
         <div>
           <div>
             <q-icon name="fact_check" size="28px" color="primary" class="q-mr-sm" />
-            <span class="title">Processos do dia</span>
+            <span class="title">Processos da data</span>
           </div>
 
-          <div class="subtitle">Status de cada processo e as pessoas responsáveis.</div>
+          <div class="subtitle">Status de cada processo para a data selecionada.</div>
         </div>
 
         <q-chip color="primary" text-color="white" icon="calendar_today" class="chip">
@@ -18,12 +18,12 @@
 
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="24px" />
-        <span>Carregando processos do dia...</span>
+        <span>Carregando processos da data...</span>
       </div>
 
       <div v-else-if="!inspectorId" class="state-box">
         <q-icon name="login" size="20px" color="grey-7" />
-        <span>Faça login para ver os processos do dia.</span>
+        <span>Faça login para ver os processos da data.</span>
       </div>
 
       <div v-else class="table-shell">
@@ -48,7 +48,7 @@
                 class="q-mr-xs"
               />
               <span :class="row.rated ? 'status-label--rated' : 'status-label--pending'">
-                {{ row.rated ? 'Avaliado hoje' : 'Pendente' }}
+                {{ row.rated ? 'Avaliado' : 'Pendente' }}
               </span>
             </td>
           </template>
@@ -68,8 +68,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
 import {
-  getTodaysDaily5sRatedProcessKeys,
-  subscribeTodaysDaily5sRatedProcessKeys,
+  getDaily5sRatedProcessKeysByDate,
+  subscribeDaily5sRatedProcessKeysByDate,
 } from 'src/services/audit';
 import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit/daily5sDefinitions';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
@@ -88,9 +88,11 @@ interface ProcessRow {
 const props = withDefaults(
   defineProps<{
     refreshToken?: number;
+    auditDate?: string;
   }>(),
   {
     refreshToken: 0,
+    auditDate: '',
   },
 );
 
@@ -180,14 +182,16 @@ async function loadRatedProcesses(): Promise<void> {
   loading.value = true;
 
   try {
-    ratedProcessKeys.value = await getTodaysDaily5sRatedProcessKeys();
+    const date = props.auditDate || new Date().toISOString().slice(0, 10);
+    ratedProcessKeys.value = await getDaily5sRatedProcessKeysByDate(date);
 
     if (unsubscribeRealtime.value) {
       unsubscribeRealtime.value();
       unsubscribeRealtime.value = null;
     }
 
-    unsubscribeRealtime.value = subscribeTodaysDaily5sRatedProcessKeys(
+    unsubscribeRealtime.value = subscribeDaily5sRatedProcessKeysByDate(
+      date,
       (keys) => {
         ratedProcessKeys.value = keys;
       },
@@ -220,6 +224,13 @@ watch(
 
 watch(
   () => props.refreshToken,
+  () => {
+    void loadRatedProcesses();
+  },
+);
+
+watch(
+  () => props.auditDate,
   () => {
     void loadRatedProcesses();
   },

@@ -190,7 +190,7 @@ export interface Daily5sCanonicalRow {
   rating: Daily5sHeatmapValue;
   status: Exclude<AuditProcessStatus, null> | null;
   hasIssue: boolean;
-  comment: Daily5sIssueReason | null;
+  comments: Daily5sIssueReason[];
   createdAtMs: number;
 }
 
@@ -229,12 +229,26 @@ export interface Daily5sIssueAnalyticsData {
   byTurmaTime: Daily5sIssueAnalyticsViewData;
   overall: Daily5sIssueAnalyticsViewData;
   byReasonAndTurma: Daily5sIssueByReasonAndTurmaData;
+  byProcess: Daily5sIssueByProcessData;
 }
 
 export interface Daily5sIssueByReasonAndTurmaData {
   reasons: Daily5sIssueReason[];
   seriesAC: number[];
   seriesBD: number[];
+  grandTotal: number;
+}
+
+export interface Daily5sIssueByProcessEntry {
+  processKey: Daily5sAuditProcessKey;
+  seriesAC: number[];
+  seriesBD: number[];
+  total: number;
+}
+
+export interface Daily5sIssueByProcessData {
+  reasons: Daily5sIssueReason[];
+  processes: Daily5sIssueByProcessEntry[];
   grandTotal: number;
 }
 
@@ -315,7 +329,7 @@ export interface DualTypeAuditResultDocument {
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
   rating?: Daily5sRatingValue | null;
-  grade1Reason?: Daily5sIssueReason | null;
+  grade1Reason?: Daily5sIssueReason[] | null;
   grade1Comment?: string | null;
   comment?: string | null;
   imageUrls?: string[] | null;

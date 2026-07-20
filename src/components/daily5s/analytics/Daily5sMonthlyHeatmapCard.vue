@@ -37,6 +37,14 @@
           :option="chartOption"
           class="chart"
           :style="{ height: `${chartHeight}px` }"
+          @click="handleHeatmapClick"
+        />
+
+        <Daily5sHeatmapDetailsDialog
+          v-model="isDetailsDialogOpen"
+          :loading="detailsLoading"
+          :error="detailsError"
+          :details="selectedDetails"
         />
       </div>
     </q-card-section>
@@ -44,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide } from 'vue';
+import { computed, provide, ref } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -57,6 +65,25 @@ import {
 } from 'echarts/components';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
+import Daily5sHeatmapDetailsDialog from 'src/components/daily5s/analytics/Daily5sHeatmapDetailsDialog.vue';
+import { getLatestDaily5sProcessResultByDate } from 'src/services/audit/auditProcessResults';
+import type { Daily5sHeatmapValue, Daily5sTurma } from 'src/types/audit';
+
+interface HeatmapDetailPayload {
+  date: string;
+  dateLabel: string;
+  turma: Daily5sTurma;
+  processKey: string;
+  processLabel: string;
+  rating: Daily5sHeatmapValue;
+  reason: string | null;
+  auditorComment: string | null;
+  imageUrls: string[];
+}
+
+interface HeatmapClickParams {
+  value?: unknown;
+}
 
 use([
   CanvasRenderer,
@@ -78,6 +105,11 @@ const hasData = computed(
   () =>
     heatmapState.value.processLabels.length > 0 && heatmapState.value.xAxisCategories.length > 0,
 );
+
+const isDetailsDialogOpen = ref(false);
+const detailsLoading = ref(false);
+const detailsError = ref<string | null>(null);
+const selectedDetails = ref<HeatmapDetailPayload | null>(null);
 
 const chartHeight = computed(() =>
   Math.max(500, heatmapState.value.processLabels.length * 24 + 180),
@@ -123,6 +155,95 @@ function tooltipFormatter(params: unknown): string {
   const ratingLabel = rating === 0 ? 'Sem avaliação' : `Nota ${rating}`;
 
   return `${category.label}<br/>${processLabel}<br/><strong>${ratingLabel}</strong><br/>Auditor: ${rosterEntry.auditor}<br/>Backup: ${rosterEntry.backup}<br/>Responsável: ${rosterEntry.responsible}`;
+}
+
+function toValidImageUrls(imageUrls: unknown): string[] {
+  if (!Array.isArray(imageUrls)) {
+    return [];
+  }
+
+  return imageUrls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0);
+}
+
+function formatGrade1Reason(reasons: unknown, legacyComment: unknown): string | null {
+  if (typeof reasons === 'string' && reasons.trim().length > 0) {
+    return reasons.trim();
+  }
+
+  if (Array.isArray(reasons)) {
+    const normalized = reasons.filter(
+      (reason): reason is string => typeof reason === 'string' && reason.trim().length > 0,
+    );
+
+    if (normalized.length > 0) {
+      return normalized.join(', ');
+    }
+  }
+
+  if (typeof legacyComment === 'string' && legacyComment.trim().length > 0) {
+    return legacyComment.trim();
+  }
+
+  return null;
+}
+
+async function handleHeatmapClick(params: unknown): Promise<void> {
+  const payload = (params as HeatmapClickParams | null)?.value;
+  const tuple = Array.isArray(payload) ? payload : [];
+  const xIndex = typeof tuple[0] === 'number' ? tuple[0] : -1;
+  const yIndex = typeof tuple[1] === 'number' ? tuple[1] : -1;
+  const rating = typeof tuple[2] === 'number' ? tuple[2] : 0;
+
+  if (rating !== 1 && rating !== 3 && rating !== 5) {
+    return;
+  }
+
+  const category = heatmapState.value.xAxisCategories[xIndex];
+  const processKey = heatmapState.value.processKeys[yIndex];
+  const processLabel = heatmapState.value.processLabels[yIndex] ?? '-';
+
+  if (!category || !processKey) {
+    return;
+  }
+
+  selectedDetails.value = {
+    date: category.date,
+    dateLabel: category.label,
+    turma: category.turma,
+    processKey,
+    processLabel,
+    rating,
+    reason: null,
+    auditorComment: null,
+    imageUrls: [],
+  };
+
+  isDetailsDialogOpen.value = true;
+  detailsLoading.value = true;
+  detailsError.value = null;
+
+  try {
+    const result = await getLatestDaily5sProcessResultByDate(category.date, processKey);
+    const reason = formatGrade1Reason(result?.grade1Reason, result?.comment);
+    const auditorComment = result?.grade1Comment?.trim() || null;
+
+    selectedDetails.value = {
+      date: category.date,
+      dateLabel: category.label,
+      turma: category.turma,
+      processKey,
+      processLabel,
+      rating,
+      reason,
+      auditorComment,
+      imageUrls: toValidImageUrls(result?.imageUrls),
+    };
+  } catch (err: unknown) {
+    detailsError.value =
+      err instanceof Error ? err.message : 'Nao foi possivel carregar os detalhes da avaliacao.';
+  } finally {
+    detailsLoading.value = false;
+  }
 }
 
 const chartOption = computed(() => ({

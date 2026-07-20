@@ -2,6 +2,18 @@ import { db } from 'boot/firebase';
 import { collection, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
 import type { DualAuditProcessKey, DualTypeAuditResultDocument } from 'src/types/audit';
 
+function getCreatedAtMs(value: unknown): number {
+  if (
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { toDate?: unknown }).toDate === 'function'
+  ) {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+
+  return 0;
+}
+
 /**
  * Checks if a process result document exists for the given audit and process.
  *
@@ -45,6 +57,41 @@ export async function getProcessResult(
   }
 
   return docSnapshot.data() as DualTypeAuditResultDocument;
+}
+
+/**
+ * Retrieves the latest Daily5S process result by date + turma + process key.
+ *
+ * This is used by analytics screens where the canonical date is known,
+ * but the persisted auditId may include a UUID suffix.
+ */
+export async function getLatestDaily5sProcessResultByDate(
+  date: string,
+  processKey: DualAuditProcessKey,
+): Promise<DualTypeAuditResultDocument | null> {
+  const daily5sQuery = query(collection(db, 'daily5sProcessResults'), where('date', '==', date));
+  const snapshots = await getDocs(daily5sQuery);
+
+  let latestCreatedAtMs = -1;
+  let latestData: DualTypeAuditResultDocument | null = null;
+
+  snapshots.forEach((snapshot) => {
+    const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
+
+    if (data.process !== processKey) {
+      return;
+    }
+
+    const createdAtMs = getCreatedAtMs(data.createdAt);
+    const normalized = data as DualTypeAuditResultDocument;
+
+    if (createdAtMs >= latestCreatedAtMs) {
+      latestCreatedAtMs = createdAtMs;
+      latestData = normalized;
+    }
+  });
+
+  return latestData;
 }
 
 /**

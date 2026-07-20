@@ -25,7 +25,7 @@ interface UpdateProcessOptions {
   printerChecks?: PrinterChecks;
   printerFiles?: Partial<Record<PrinterCheckKey, File[] | null>>;
   rating?: Daily5sRatingValue;
-  grade1Reason?: Daily5sIssueReason | null;
+  grade1Reason?: Daily5sIssueReason[] | null;
   grade1Comment?: string | null;
 }
 
@@ -39,6 +39,27 @@ function normalizeImageUrls(imageUrls: unknown): string[] {
       }
     });
   }
+
+  return [...normalized];
+}
+
+function normalizeGrade1Reasons(reasons: unknown): Daily5sIssueReason[] {
+  if (!Array.isArray(reasons)) {
+    return [];
+  }
+
+  const normalized = new Set<Daily5sIssueReason>();
+
+  reasons.forEach((reason) => {
+    if (
+      reason === 'Latas acumuladas' ||
+      reason === 'Sujeira no Piso' ||
+      reason === 'Sujeira nas Máquinas' ||
+      reason === 'Desorganização'
+    ) {
+      normalized.add(reason);
+    }
+  });
 
   return [...normalized];
 }
@@ -366,7 +387,7 @@ export function createAuditService(config: AuditServiceConfig) {
 
     const hasIssue = status === 'not_updated';
     const normalizedComment = hasIssue ? comment?.trim() || null : null;
-    const normalizedGrade1Reason = hasIssue ? (options?.grade1Reason ?? null) : null;
+    const normalizedGrade1Reason = hasIssue ? normalizeGrade1Reasons(options?.grade1Reason) : [];
     const normalizedGrade1Comment = hasIssue ? options?.grade1Comment?.trim() || null : null;
 
     const resultPayloadBase: DualTypeAuditResultDocument = {
@@ -384,7 +405,7 @@ export function createAuditService(config: AuditServiceConfig) {
       config.resultsCollection === 'daily5sProcessResults'
         ? {
             ...resultPayloadBase,
-            grade1Reason: normalizedGrade1Reason,
+            grade1Reason: hasIssue ? normalizedGrade1Reason : [],
             grade1Comment: normalizedGrade1Comment,
           }
         : {

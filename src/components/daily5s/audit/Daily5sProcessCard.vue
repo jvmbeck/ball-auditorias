@@ -43,9 +43,11 @@
         <q-select
           :model-value="modelValue.grade1Reason"
           :options="commentOptions"
+          multiple
+          use-chips
           outlined
           clearable
-          label="Selecione o motivo da nota 1"
+          label="Selecione os motivos da nota 1"
           class="q-mb-md"
           @update:model-value="onReasonChange"
         >
@@ -114,7 +116,7 @@ import Daily5sInfoDialog from './Daily5sInfoDialog.vue';
 
 interface ProcessValue {
   rating: Daily5sRatingValue | null;
-  grade1Reason: string;
+  grade1Reason: string[];
   grade1Comment: string;
 }
 
@@ -196,13 +198,13 @@ const isValid = computed(() => {
     return true;
   }
 
-  return Boolean(grade1Reason.trim()) && props.files.length > 0;
+  return grade1Reason.length > 0 && props.files.length > 0;
 });
 
 function onRatingChange(value: Daily5sRatingValue | null) {
   emit('update:modelValue', {
     rating: value,
-    grade1Reason: value === 1 ? props.modelValue.grade1Reason : '',
+    grade1Reason: value === 1 ? props.modelValue.grade1Reason : [],
     grade1Comment: value === 1 ? props.modelValue.grade1Comment : '',
   });
 
@@ -211,10 +213,18 @@ function onRatingChange(value: Daily5sRatingValue | null) {
   }
 }
 
-function onReasonChange(value: string | null) {
+function onReasonChange(value: string | string[] | null) {
+  const nextReasons = Array.isArray(value)
+    ? value.filter(
+        (reason): reason is string => typeof reason === 'string' && reason.trim().length > 0,
+      )
+    : value && value.trim().length > 0
+      ? [value]
+      : [];
+
   emit('update:modelValue', {
     ...props.modelValue,
-    grade1Reason: String(value ?? ''),
+    grade1Reason: nextReasons,
   });
 }
 

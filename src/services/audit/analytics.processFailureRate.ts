@@ -64,7 +64,7 @@ export async function fetchProcessFailureRates(type?: AuditType): Promise<Proces
     const data = snapshot.data() as Partial<{
       process: unknown;
       processKey: unknown;
-      hasIssue: unknown;
+      status: unknown;
       date: unknown;
     }>;
 
@@ -83,7 +83,7 @@ export async function fetchProcessFailureRates(type?: AuditType): Promise<Proces
     const processLabel = normalizeProcessLabel(processRaw);
     totalsByProcess[processLabel] = (totalsByProcess[processLabel] ?? 0) + 1;
 
-    if (data.hasIssue === true) {
+    if (data.status === 'not_updated') {
       failuresByProcess[processLabel] = (failuresByProcess[processLabel] ?? 0) + 1;
     }
   });

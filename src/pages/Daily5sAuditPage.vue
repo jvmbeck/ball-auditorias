@@ -13,7 +13,19 @@
       </section>
 
       <section class="row q-col-gutter-md q-mb-lg">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
+          <q-input
+            :model-value="selectedAuditDate"
+            outlined
+            dense
+            type="date"
+            label="Data da auditoria"
+            :max="todayDate"
+            @update:model-value="onAuditDateChange"
+          />
+        </div>
+
+        <div class="col-12 col-md-3">
           <q-select
             v-model="selectedTurma"
             outlined
@@ -26,7 +38,7 @@
           />
         </div>
 
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <q-select
             :model-value="selectedFrontEndProcesses"
             multiple
@@ -41,7 +53,7 @@
           />
         </div>
 
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <q-select
             :model-value="selectedBackEndProcesses"
             multiple
@@ -107,7 +119,10 @@
       </div>
 
       <section class="q-mb-lg">
-        <Daily5sRatedProcessesCard :refresh-token="ratedProcessesRefreshToken" />
+        <Daily5sRatedProcessesCard
+          :refresh-token="ratedProcessesRefreshToken"
+          :audit-date="selectedAuditDate"
+        />
       </section>
 
       <section class="footer-actions">
@@ -146,6 +161,7 @@ const daily5sStore = useDaily5sAuditStore();
 
 const {
   turma,
+  selectedAuditDate,
   selectedProcessKeys,
   processState,
   processFiles,
@@ -158,6 +174,7 @@ const {
 
 const pageError = ref<string | null>(null);
 const ratedProcessesRefreshToken = ref(0);
+const todayDate = new Date().toISOString().slice(0, 10);
 
 const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
   { label: 'A e C', value: 'A e C' },
@@ -168,6 +185,24 @@ const selectedTurma = computed<'A e C' | 'B e D' | null>({
   get: () => turma.value,
   set: (value) => daily5sStore.setTurma(value),
 });
+
+async function onAuditDateChange(value: string | number | null): Promise<void> {
+  if (typeof value !== 'string' || !value) {
+    return;
+  }
+
+  pageError.value = null;
+
+  try {
+    daily5sStore.setAuditDate(value);
+    await daily5sStore.initialize();
+    ratedProcessesRefreshToken.value += 1;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    pageError.value = message;
+    $q.notify({ type: 'negative', message });
+  }
+}
 
 const FRONT_END_PROCESS_KEY_SET = new Set(
   DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => process.key),

@@ -37,22 +37,39 @@
 
       <div v-if="modelValue.rating === 1" class="q-mt-md">
         <q-banner dense rounded class="bg-red-1 text-red-9 q-mb-md">
-          Nota 1 exige justificativa com descrição e imagem.
+          Nota 1 exige justificativa com motivo e imagem.
         </q-banner>
 
         <q-select
-          :model-value="modelValue.comment"
+          :model-value="modelValue.grade1Reason"
           :options="commentOptions"
+          multiple
+          use-chips
           outlined
           clearable
-          label="Selecione o motivo da nota 1"
+          label="Selecione os motivos da nota 1"
           class="q-mb-md"
-          @update:model-value="onCommentChange"
+          @update:model-value="onReasonChange"
         >
           <template #prepend>
             <q-icon name="playlist_add_check" />
           </template>
         </q-select>
+
+        <q-input
+          :model-value="modelValue.grade1Comment"
+          outlined
+          clearable
+          type="textarea"
+          autogrow
+          label="Detalhes da nota 1 (opcional)"
+          class="q-mb-md"
+          @update:model-value="onGrade1CommentChange"
+        >
+          <template #prepend>
+            <q-icon name="edit_note" />
+          </template>
+        </q-input>
 
         <q-file
           :model-value="files"
@@ -99,7 +116,8 @@ import Daily5sInfoDialog from './Daily5sInfoDialog.vue';
 
 interface ProcessValue {
   rating: Daily5sRatingValue | null;
-  comment: string;
+  grade1Reason: string[];
+  grade1Comment: string;
 }
 
 const props = defineProps<{
@@ -170,7 +188,7 @@ const statusChip = computed(() => {
 });
 
 const isValid = computed(() => {
-  const { rating, comment } = props.modelValue;
+  const { rating, grade1Reason } = props.modelValue;
 
   if (rating === null) {
     return false;
@@ -180,13 +198,14 @@ const isValid = computed(() => {
     return true;
   }
 
-  return Boolean(comment.trim()) && props.files.length > 0;
+  return grade1Reason.length > 0 && props.files.length > 0;
 });
 
 function onRatingChange(value: Daily5sRatingValue | null) {
   emit('update:modelValue', {
     rating: value,
-    comment: value === 1 ? props.modelValue.comment : '',
+    grade1Reason: value === 1 ? props.modelValue.grade1Reason : [],
+    grade1Comment: value === 1 ? props.modelValue.grade1Comment : '',
   });
 
   if (value !== 1) {
@@ -194,10 +213,25 @@ function onRatingChange(value: Daily5sRatingValue | null) {
   }
 }
 
-function onCommentChange(value: string | null) {
+function onReasonChange(value: string | string[] | null) {
+  const nextReasons = Array.isArray(value)
+    ? value.filter(
+        (reason): reason is string => typeof reason === 'string' && reason.trim().length > 0,
+      )
+    : value && value.trim().length > 0
+      ? [value]
+      : [];
+
   emit('update:modelValue', {
     ...props.modelValue,
-    comment: String(value ?? ''),
+    grade1Reason: nextReasons,
+  });
+}
+
+function onGrade1CommentChange(value: string | number | null) {
+  emit('update:modelValue', {
+    ...props.modelValue,
+    grade1Comment: String(value ?? ''),
   });
 }
 

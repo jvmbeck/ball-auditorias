@@ -21,6 +21,7 @@ import type {
   Daily5sIssueAnalyticsData,
   Daily5sIssueAnalyticsSeries,
   Daily5sIssueAnalyticsViewData,
+  Daily5sIssueByProcessData,
   Daily5sIssueByReasonAndTurmaData,
   Daily5sIssueReason,
   Daily5sMonthlyHeatmapData,
@@ -105,6 +106,26 @@ function normalizeRating(rating: unknown, status: unknown): Daily5sHeatmapValue 
   }
 
   return 0;
+}
+
+function normalizeReasons(grade1Reason: unknown, legacyComment: unknown): Daily5sIssueReason[] {
+  const normalized = new Set<Daily5sIssueReason>();
+
+  if (Array.isArray(grade1Reason)) {
+    grade1Reason.forEach((value) => {
+      if (isDaily5sIssueReason(value)) {
+        normalized.add(value);
+      }
+    });
+  } else if (isDaily5sIssueReason(grade1Reason)) {
+    normalized.add(grade1Reason);
+  }
+
+  if (normalized.size === 0 && isDaily5sIssueReason(legacyComment)) {
+    normalized.add(legacyComment);
+  }
+
+  return [...normalized];
 }
 
 function sortBuckets(
@@ -237,7 +258,7 @@ export async function fetchDaily5sCanonicalMonthlyData(
       process: unknown;
       rating: unknown;
       status: unknown;
-      hasIssue: unknown;
+      grade1Reason: unknown;
       comment: unknown;
       createdAt: unknown;
     }>;
@@ -250,15 +271,20 @@ export async function fetchDaily5sCanonicalMonthlyData(
       return;
     }
 
+    const normalizedStatus =
+      data.status === 'updated' || data.status === 'not_updated' ? data.status : null;
+
+    const reasons = normalizeReasons(data.grade1Reason, data.comment);
+
     rows.push({
       id: snapshot.id,
       date,
       turma,
       process,
       rating: normalizeRating(data.rating, data.status),
-      status: data.status === 'updated' || data.status === 'not_updated' ? data.status : null,
-      hasIssue: data.hasIssue === true,
-      comment: isDaily5sIssueReason(data.comment) ? data.comment : null,
+      status: normalizedStatus,
+      hasIssue: normalizedStatus === 'not_updated',
+      comments: reasons,
       createdAtMs: getTimestampMs(data.createdAt),
     });
   });
@@ -340,9 +366,18 @@ export function deriveDaily5sIssueAnalytics(
   const overallMap = new Map<string, Daily5sIssueAnalyticsBucket>();
   const countsAC = createEmptyReasonCounts();
   const countsBD = createEmptyReasonCounts();
+  const countsByProcess = new Map(
+    DAILY5S_PROCESS_DEFINITIONS.map((definition) => [
+      definition.key,
+      {
+        seriesAC: createEmptyReasonCounts(),
+        seriesBD: createEmptyReasonCounts(),
+      },
+    ]),
+  );
 
   canonical.rows.forEach((row) => {
-    if (!row.hasIssue || !row.comment) {
+    if (!row.hasIssue || row.comments.length === 0) {
       return;
     }
 
@@ -350,49 +385,59 @@ export function deriveDaily5sIssueAnalytics(
       return;
     }
 
-    const reason = row.comment;
-    const turmaKey = `${row.date}|${row.turma}`;
-    const turmaLabel = row.turma === 'A e C' ? 'A/C' : 'B/D';
+    row.comments.forEach((reason) => {
+      const turmaKey = `${row.date}|${row.turma}`;
+      const turmaLabel = row.turma === 'A e C' ? 'A/C' : 'B/D';
 
-    const existingTurmaBucket = byTurmaTimeMap.get(turmaKey);
-    if (existingTurmaBucket) {
-      existingTurmaBucket.countsByReason[reason] += 1;
-      existingTurmaBucket.total += 1;
-    } else {
-      const reasonCounts = createEmptyReasonCounts();
-      reasonCounts[reason] = 1;
-      byTurmaTimeMap.set(turmaKey, {
-        key: turmaKey,
-        date: row.date,
-        turma: row.turma,
-        displayLabel: `${toDisplayDate(row.date)}\n${turmaLabel}`,
-        countsByReason: reasonCounts,
-        total: 1,
-      });
-    }
+      const existingTurmaBucket = byTurmaTimeMap.get(turmaKey);
+      if (existingTurmaBucket) {
+        existingTurmaBucket.countsByReason[reason] += 1;
+        existingTurmaBucket.total += 1;
+      } else {
+        const reasonCounts = createEmptyReasonCounts();
+        reasonCounts[reason] = 1;
+        byTurmaTimeMap.set(turmaKey, {
+          key: turmaKey,
+          date: row.date,
+          turma: row.turma,
+          displayLabel: `${toDisplayDate(row.date)}\n${turmaLabel}`,
+          countsByReason: reasonCounts,
+          total: 1,
+        });
+      }
 
-    const overallBucket = overallMap.get(row.date);
-    if (overallBucket) {
-      overallBucket.countsByReason[reason] += 1;
-      overallBucket.total += 1;
-    } else {
-      const overallCounts = createEmptyReasonCounts();
-      overallCounts[reason] = 1;
-      overallMap.set(row.date, {
-        key: row.date,
-        date: row.date,
-        turma: null,
-        displayLabel: toDisplayDate(row.date),
-        countsByReason: overallCounts,
-        total: 1,
-      });
-    }
+      const overallBucket = overallMap.get(row.date);
+      if (overallBucket) {
+        overallBucket.countsByReason[reason] += 1;
+        overallBucket.total += 1;
+      } else {
+        const overallCounts = createEmptyReasonCounts();
+        overallCounts[reason] = 1;
+        overallMap.set(row.date, {
+          key: row.date,
+          date: row.date,
+          turma: null,
+          displayLabel: toDisplayDate(row.date),
+          countsByReason: overallCounts,
+          total: 1,
+        });
+      }
 
-    if (row.turma === 'A e C') {
-      countsAC[reason] += 1;
-    } else {
-      countsBD[reason] += 1;
-    }
+      if (row.turma === 'A e C') {
+        countsAC[reason] += 1;
+      } else {
+        countsBD[reason] += 1;
+      }
+
+      const processCounts = countsByProcess.get(row.process);
+      if (processCounts) {
+        if (row.turma === 'A e C') {
+          processCounts.seriesAC[reason] += 1;
+        } else {
+          processCounts.seriesBD[reason] += 1;
+        }
+      }
+    });
   });
 
   const byTurmaTime = buildViewData([...byTurmaTimeMap.values()]);
@@ -408,11 +453,29 @@ export function deriveDaily5sIssueAnalytics(
     ),
   };
 
+  const byProcess: Daily5sIssueByProcessData = {
+    reasons: [...DAILY5S_ISSUE_REASONS],
+    processes: DAILY5S_PROCESS_DEFINITIONS.map((definition) => {
+      const processCounts = countsByProcess.get(definition.key);
+      const seriesAC = DAILY5S_ISSUE_REASONS.map((reason) => processCounts?.seriesAC[reason] ?? 0);
+      const seriesBD = DAILY5S_ISSUE_REASONS.map((reason) => processCounts?.seriesBD[reason] ?? 0);
+
+      return {
+        processKey: definition.key,
+        seriesAC,
+        seriesBD,
+        total: [...seriesAC, ...seriesBD].reduce((sum, value) => sum + value, 0),
+      };
+    }),
+    grandTotal: byReasonAndTurma.grandTotal,
+  };
+
   return {
     monthKey: canonical.monthKey,
     byTurmaTime,
     overall,
     byReasonAndTurma,
+    byProcess,
   };
 }
 
@@ -491,23 +554,24 @@ export function deriveDaily5sActionPlan(
   const range = normalizeRange(canonical.monthKey, startDateKey, endDateKey);
 
   const rows: Daily5sActionPlanRow[] = canonical.rows
-    .filter((row) => row.rating === 1 && !!row.comment)
+    .filter((row) => row.rating === 1 && row.comments.length > 0)
     .filter((row) => row.date >= range.from && row.date <= range.to)
-    .map((row) => {
-      const reason = row.comment as Daily5sIssueReason;
-      const roster = DAILY5S_PROCESS_ROSTER[row.process];
+    .flatMap((row) =>
+      row.comments.map((reason) => {
+        const roster = DAILY5S_PROCESS_ROSTER[row.process];
 
-      return {
-        id: row.id,
-        date: row.date,
-        turma: row.turma,
-        process: DAILY5S_PROCESS_LABELS[row.process] ?? row.process,
-        auditor: roster?.auditor || 'A definir',
-        processResponsible: roster?.responsible || 'A definir',
-        reason,
-        whoShouldAct: ACTION_OWNER_BY_REASON[reason] ?? 'Nao definido',
-      };
-    });
+        return {
+          id: `${row.id}_${reason}`,
+          date: row.date,
+          turma: row.turma,
+          process: DAILY5S_PROCESS_LABELS[row.process] ?? row.process,
+          auditor: roster?.auditor || 'A definir',
+          processResponsible: roster?.responsible || 'A definir',
+          reason,
+          whoShouldAct: ACTION_OWNER_BY_REASON[reason] ?? 'Nao definido',
+        };
+      }),
+    );
 
   rows.sort((left, right) => {
     const byDate = right.date.localeCompare(left.date);

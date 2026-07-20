@@ -50,6 +50,10 @@
       <section class="q-mt-lg">
         <div class="daily5s-grid">
           <Daily5sRatedProcessesCard />
+          <Daily5sScoreProgressCard
+            :month-key="currentMonthKey"
+            :refresh-token="daily5sAnalyticsRefreshToken"
+          />
         </div>
       </section>
     </div>
@@ -58,6 +62,12 @@
 
 <script setup lang="ts">
 import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRatedProcessesCard.vue';
+import Daily5sScoreProgressCard from 'src/components/daily5s/analytics/Daily5sScoreProgressCard.vue';
+import { toDateKey } from 'src/utils/dateFormatting';
+import { ref } from 'vue';
+
+const currentMonthKey = toDateKey(new Date()).slice(0, 7);
+const daily5sAnalyticsRefreshToken = ref(0);
 </script>
 
 <style scoped>

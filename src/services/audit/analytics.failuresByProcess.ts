@@ -56,7 +56,7 @@ export async function fetchFailuresByProcess(type?: AuditType): Promise<Failures
   const failuresByProcess: Record<string, number> = {};
 
   const collectionName = getResultsCollection(type);
-  const failuresQuery = query(collection(db, collectionName), where('hasIssue', '==', true));
+  const failuresQuery = query(collection(db, collectionName), where('status', '==', 'not_updated'));
   const snapshots = await getDocs(failuresQuery);
 
   snapshots.forEach((snapshot) => {

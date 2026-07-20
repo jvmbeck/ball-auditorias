@@ -5,8 +5,9 @@ import {
   DAILY5S_PROCESS_DEFINITIONS,
   daily5sAuditService,
   getDaily5sResultsForAudit,
-  getTodaysDaily5sStatus,
+  getDaily5sStatusByDate,
 } from 'src/services/audit';
+import { isDaily5sIssueReason } from 'src/services/audit/daily5sDefinitions';
 import type {
   Daily5sAuditProcessKey,
   Daily5sRatingValue,
@@ -15,7 +16,8 @@ import type {
 
 interface Daily5sProcessEntry {
   rating: Daily5sRatingValue | null;
-  comment: string;
+  grade1Reason: string[];
+  grade1Comment: string;
 }
 
 type Daily5sProcessState = Record<Daily5sAuditProcessKey, Daily5sProcessEntry>;
@@ -42,7 +44,7 @@ function createDaily5sAuditId(dayId: string): string {
 
 function buildInitialProcessState(): Daily5sProcessState {
   return DAILY5S_KEYS.reduce((acc, key) => {
-    acc[key] = { rating: null, comment: '' };
+    acc[key] = { rating: null, grade1Reason: [], grade1Comment: '' };
     return acc;
   }, {} as Daily5sProcessState);
 }
@@ -72,6 +74,7 @@ export const useDaily5sAuditStore = defineStore(
 
     const auditId = ref<string | null>(null);
     const turma = ref<'A e C' | 'B e D' | null>(null);
+    const selectedAuditDate = ref<string>(getTodayKey());
     const selectedProcessKeys = ref<Daily5sAuditProcessKey[]>([]);
 
     const processState = reactive<Daily5sProcessState>(buildInitialProcessState());
@@ -103,7 +106,7 @@ export const useDaily5sAuditStore = defineStore(
         if (!entry || entry.rating === null) {
           return false;
         }
-        const { rating, comment } = entry;
+        const { rating, grade1Reason } = entry;
         if (rating === null) {
           return false;
         }
@@ -112,13 +115,13 @@ export const useDaily5sAuditStore = defineStore(
           return true;
         }
 
-        return Boolean(comment.trim()) && processFiles[key].length > 0;
+        return grade1Reason.length > 0 && processFiles[key].length > 0;
       });
     });
 
     function clearProcessStates(): void {
       DAILY5S_KEYS.forEach((key) => {
-        processState[key] = { rating: null, comment: '' };
+        processState[key] = { rating: null, grade1Reason: [], grade1Comment: '' };
         processFiles[key] = [];
         savedProcesses[key] = false;
       });
@@ -137,14 +140,14 @@ export const useDaily5sAuditStore = defineStore(
     }
 
     function discardStaleDraftIfNeeded(): void {
-      const today = getTodayKey();
+      const activeDate = selectedAuditDate.value;
       const auditorId = authStore.firebaseUser?.uid ?? null;
 
       const isDifferentAuditor = Boolean(
         draftAuditorId.value && draftAuditorId.value !== auditorId,
       );
-      const isDifferentDay = Boolean(draftDate.value && draftDate.value !== today);
-      const hasStaleAuditId = Boolean(auditId.value && !auditId.value.startsWith(today));
+      const isDifferentDay = Boolean(draftDate.value && draftDate.value !== activeDate);
+      const hasStaleAuditId = Boolean(auditId.value && !auditId.value.startsWith(activeDate));
 
       if (!isDifferentAuditor && !isDifferentDay && !hasStaleAuditId) {
         return;
@@ -161,6 +164,19 @@ export const useDaily5sAuditStore = defineStore(
 
     function setTurma(value: 'A e C' | 'B e D' | null): void {
       turma.value = value;
+    }
+
+    function setAuditDate(value: string): void {
+      if (!value || value === selectedAuditDate.value) {
+        return;
+      }
+
+      selectedAuditDate.value = value;
+      clearActiveDraftState();
+      draftDate.value = null;
+      draftCompleted.value = false;
+      draftCompletedAuditId.value = null;
+      dayRolloverNotice.value = false;
     }
 
     const DAILY5S_KEY_SET = new Set(DAILY5S_KEYS);
@@ -184,7 +200,8 @@ export const useDaily5sAuditStore = defineStore(
       persisted.forEach((result) => {
         processState[result.process] = {
           rating: result.rating,
-          comment: result.comment,
+          grade1Reason: result.grade1Reason,
+          grade1Comment: result.grade1Comment,
         };
         processFiles[result.process] = [];
         savedProcesses[result.process] = true;
@@ -201,24 +218,29 @@ export const useDaily5sAuditStore = defineStore(
         return;
       }
 
+      // The audit page should always start with no visible process cards.
+      // Users choose processes each time they open the page.
+      selectedProcessKeys.value = [];
+      clearProcessStates();
+
       discardStaleDraftIfNeeded();
 
       // Keep local draft if it already belongs to today and this user.
       if (
         auditId.value &&
-        draftDate.value === getTodayKey() &&
+        draftDate.value === selectedAuditDate.value &&
         draftAuditorId.value === auditorId &&
         !draftCompleted.value
       ) {
         return;
       }
 
-      const todaysStatus = await getTodaysDaily5sStatus(auditorId);
+      const todaysStatus = await getDaily5sStatusByDate(auditorId, selectedAuditDate.value);
       if (!todaysStatus) {
         return;
       }
 
-      draftDate.value = getTodayKey();
+      draftDate.value = selectedAuditDate.value;
       draftAuditorId.value = auditorId;
       draftCompleted.value = todaysStatus.completed;
       draftCompletedAuditId.value = todaysStatus.completed ? todaysStatus.auditId : null;
@@ -253,17 +275,15 @@ export const useDaily5sAuditStore = defineStore(
         return;
       }
 
-      const today = getTodayKey();
       const createdAuditId = await daily5sAuditService.createAudit(
-        createDaily5sAuditId(today),
-        today,
+        createDaily5sAuditId(selectedAuditDate.value),
+        selectedAuditDate.value,
         turma.value,
         auditorId,
-        today,
       );
 
       auditId.value = createdAuditId;
-      draftDate.value = today;
+      draftDate.value = selectedAuditDate.value;
       draftAuditorId.value = auditorId;
       draftCompleted.value = false;
       draftCompletedAuditId.value = null;
@@ -274,17 +294,24 @@ export const useDaily5sAuditStore = defineStore(
         throw new Error('Selecione o processo antes de salvar a avaliacao.');
       }
 
-      const { rating, comment } = processState[processKey];
+      const { rating, grade1Reason, grade1Comment } = processState[processKey];
       if (rating === null) {
         throw new Error('Selecione uma nota (1, 3 ou 5) para salvar o processo.');
       }
 
-      const trimmedComment = comment.trim();
+      const normalizedReasons = grade1Reason
+        .map((reason) => reason.trim())
+        .filter((reason): reason is string => reason.length > 0);
+      const trimmedGrade1Comment = grade1Comment.trim();
       const files = processFiles[processKey];
 
       if (rating === 1) {
-        if (!trimmedComment) {
-          throw new Error('Descricao obrigatoria para nota 1.');
+        if (!normalizedReasons.length) {
+          throw new Error('Motivo obrigatorio para nota 1.');
+        }
+
+        if (!normalizedReasons.every((reason) => isDaily5sIssueReason(reason))) {
+          throw new Error('Motivo invalido para nota 1.');
         }
 
         if (!files.length) {
@@ -296,13 +323,20 @@ export const useDaily5sAuditStore = defineStore(
 
       await daily5sAuditService.updateProcess(
         auditId.value as string,
-        getTodayKey(),
+        selectedAuditDate.value,
         turma.value as 'A e C' | 'B e D',
         processKey,
         toStatus(rating),
-        rating === 1 ? trimmedComment : null,
+        null,
         rating === 1 ? files : null,
-        { rating },
+        {
+          rating,
+          grade1Reason:
+            rating === 1
+              ? normalizedReasons.filter((reason) => isDaily5sIssueReason(reason))
+              : null,
+          grade1Comment: rating === 1 ? trimmedGrade1Comment || null : null,
+        },
       );
 
       processFiles[processKey] = [];
@@ -397,6 +431,7 @@ export const useDaily5sAuditStore = defineStore(
     return {
       auditId,
       turma,
+      selectedAuditDate,
       selectedProcessKeys,
       processState,
       processFiles,
@@ -407,6 +442,7 @@ export const useDaily5sAuditStore = defineStore(
       ratedCount,
       allSelectedValid,
       setTurma,
+      setAuditDate,
       setSelectedProcesses,
       initialize,
       saveProcess,
@@ -417,13 +453,11 @@ export const useDaily5sAuditStore = defineStore(
   },
   {
     persist: {
-      key: 'daily-5s-audit-form-draft-v4',
+      key: 'daily-5s-audit-form-draft-v5',
       pick: [
         'auditId',
         'turma',
-        'selectedProcessKeys',
-        'processState',
-        'savedProcesses',
+        'selectedAuditDate',
         'draftDate',
         'draftAuditorId',
         'draftCompleted',

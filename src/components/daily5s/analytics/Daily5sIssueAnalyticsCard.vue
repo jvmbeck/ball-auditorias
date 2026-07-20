@@ -4,27 +4,42 @@
       <div class="header q-mb-sm">
         <q-icon name="insights" size="24px" color="primary" class="q-mr-sm" />
         <div>
-          <div class="title">Issues do mês</div>
-          <div class="subtitle">
-            {{ viewMode === 'byTurma' ? 'Por turma' : 'Total geral' }} · {{ rangeDisplay }}
-          </div>
+          <div class="title">Problemas do mês</div>
+          <div class="subtitle">{{ subtitleText }}</div>
         </div>
       </div>
 
       <div>
         <div class="toolbar q-mb-md">
           <div class="toolbar-left">
-            <q-btn-toggle
-              v-model="viewMode"
-              unelevated
-              no-caps
-              toggle-color="primary"
-              color="grey-3"
-              text-color="grey-9"
-              :options="viewOptions"
-              class="view-toggle"
+            <q-select
+              v-model="selectedProcessKey"
+              outlined
+              dense
+              clearable
+              emit-value
+              map-options
+              use-input
+              fill-input
+              hide-selected
+              input-debounce="0"
+              :options="filteredProcessOptions"
+              label="Área / processo"
+              class="process-select"
+              @filter="filterProcessOptions"
             />
 
+            <q-option-group
+              :model-value="displayMode"
+              :options="displayOptions"
+              color="primary"
+              type="radio"
+              inline
+              @update:model-value="onDisplayModeChange"
+            />
+          </div>
+
+          <div class="toolbar-right">
             <q-btn-toggle
               v-model="metricMode"
               unelevated
@@ -35,10 +50,8 @@
               :options="metricOptions"
               class="view-toggle"
             />
-          </div>
 
-          <div class="toolbar-right">
-            <template v-if="viewMode === 'byTurma'">
+            <template v-if="displayMode === 'byTurma'">
               <q-chip
                 v-for="series in turmaSeriesMeta"
                 :key="series.key"
@@ -58,7 +71,7 @@
             </template>
 
             <q-chip color="primary" text-color="white" icon="report_problem">
-              {{ issueAnalytics.byReasonAndTurma.grandTotal }} issues
+              {{ issueTotal }} issues
             </q-chip>
           </div>
         </div>
@@ -95,10 +108,15 @@
 import { computed, provide, ref } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import {
+  DAILY5S_PROCESS_DEFINITIONS,
+  DAILY5S_PROCESS_SECTION_LABELS,
+} from 'src/services/audit/daily5sDefinitions';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
+import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent, LegendComponent]);
 provide(THEME_KEY, 'light');
@@ -108,17 +126,23 @@ const TURMA_SERIES_META = [
   { key: 'BD' as const, label: 'B e D', color: '#d64545' },
 ];
 
-type ViewMode = 'byTurma' | 'overall';
+type DisplayMode = 'byTurma' | 'overall';
 type MetricMode = 'count' | 'percentage';
+
+interface ProcessOption {
+  label: string;
+  value: Daily5sAuditProcessKey;
+  searchLabel: string;
+}
 
 interface DateRangeValue {
   from: string;
   to: string;
 }
 
-const viewOptions = [
+const displayOptions = [
   { label: 'Por turma', value: 'byTurma' },
-  { label: 'Total geral', value: 'overall' },
+  { label: 'Total', value: 'overall' },
 ];
 
 const metricOptions = [
@@ -160,29 +184,18 @@ function formatRangeDisplay(range: DateRangeValue | null): string {
   return `${toDisplayDate(range.from)} - ${toDisplayDate(to)}`;
 }
 
-const baseMonthKey = computed(() => getMonthKey(props.monthKey));
-const rangeDisplay = computed(() => formatRangeDisplay(props.dateRange));
+function onDisplayModeChange(value: string | number | boolean | null): void {
+  displayMode.value = value === 'overall' ? 'overall' : 'byTurma';
+}
 
-const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
-const error = computed(() => analyticsStore.daily5sAnalyticsError);
-const viewMode = ref<ViewMode>('byTurma');
-const metricMode = ref<MetricMode>('count');
-const issueAnalytics = computed(() => {
-  if (analyticsStore.daily5sMonthlyHeatmapMonth !== baseMonthKey.value) {
-    return {
-      monthKey: '',
-      byTurmaTime: { labels: [], buckets: [], series: [], grandTotal: 0 },
-      overall: { labels: [], buckets: [], series: [], grandTotal: 0 },
-      byReasonAndTurma: { reasons: [], seriesAC: [], seriesBD: [], grandTotal: 0 },
-    };
-  }
-
-  return analyticsStore.getDaily5sIssueAnalyticsByRange(props.dateRange.from, props.dateRange.to);
-});
-
-const turmaSeriesMeta = TURMA_SERIES_META;
-
-const activeKeys = ref(new Set<'AC' | 'BD'>(['AC', 'BD']));
+function filterProcessOptions(value: string, update: (callback: () => void) => void): void {
+  update(() => {
+    const needle = value.trim().toLowerCase();
+    filteredProcessOptions.value = needle
+      ? allProcessOptions.filter((option) => option.searchLabel.includes(needle))
+      : allProcessOptions;
+  });
+}
 
 function toggleTurma(key: 'AC' | 'BD'): void {
   const next = new Set(activeKeys.value);
@@ -214,29 +227,84 @@ function formatMetricValue(value: number): string {
   return String(Math.round(value));
 }
 
-const hasData = computed(() => issueAnalytics.value.byReasonAndTurma.grandTotal > 0);
+const baseMonthKey = computed(() => getMonthKey(props.monthKey));
+const rangeDisplay = computed(() => formatRangeDisplay(props.dateRange));
+
+const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
+const error = computed(() => analyticsStore.daily5sAnalyticsError);
+const displayMode = ref<DisplayMode>('byTurma');
+const metricMode = ref<MetricMode>('count');
+
+const issueAnalytics = computed(() => {
+  if (analyticsStore.daily5sMonthlyHeatmapMonth !== baseMonthKey.value) {
+    return {
+      monthKey: '',
+      byTurmaTime: { labels: [], buckets: [], series: [], grandTotal: 0 },
+      overall: { labels: [], buckets: [], series: [], grandTotal: 0 },
+      byReasonAndTurma: { reasons: [], seriesAC: [], seriesBD: [], grandTotal: 0 },
+      byProcess: { reasons: [], processes: [], grandTotal: 0 },
+    };
+  }
+
+  return analyticsStore.getDaily5sIssueAnalyticsByRange(props.dateRange.from, props.dateRange.to);
+});
+
+const turmaSeriesMeta = TURMA_SERIES_META;
+const allProcessOptions: ProcessOption[] = DAILY5S_PROCESS_DEFINITIONS.map((process) => ({
+  label: `${DAILY5S_PROCESS_SECTION_LABELS[process.section]} · ${process.label}`,
+  value: process.key,
+  searchLabel: `${DAILY5S_PROCESS_SECTION_LABELS[process.section]} ${process.label}`.toLowerCase(),
+}));
+const filteredProcessOptions = ref<ProcessOption[]>(allProcessOptions);
+const selectedProcessKey = ref<Daily5sAuditProcessKey | null>(null);
+const activeKeys = ref(new Set<'AC' | 'BD'>(['AC', 'BD']));
+
+const selectedProcessData = computed(() => {
+  if (!selectedProcessKey.value) {
+    return null;
+  }
+
+  return (
+    issueAnalytics.value.byProcess.processes.find(
+      (process) => process.processKey === selectedProcessKey.value,
+    ) ?? null
+  );
+});
+
+const selectedProcessLabel = computed(
+  () => allProcessOptions.find((option) => option.value === selectedProcessKey.value)?.label ?? '',
+);
+
+const subtitleText = computed(() => {
+  const scopeLabel = selectedProcessLabel.value || 'Todas as áreas';
+  const modeLabel = displayMode.value === 'byTurma' ? 'Por turma' : 'Total';
+  return `${scopeLabel} · ${modeLabel} · ${rangeDisplay.value}`;
+});
+
+const issueTotal = computed(
+  () => selectedProcessData.value?.total ?? issueAnalytics.value.byReasonAndTurma.grandTotal,
+);
+
+const hasData = computed(() => issueTotal.value > 0);
 
 const chartOption = computed(() => {
-  const { reasons, seriesAC, seriesBD } = issueAnalytics.value.byReasonAndTurma;
-  const grandTotal = issueAnalytics.value.byReasonAndTurma.grandTotal;
-  const totalAC = seriesAC.reduce((sum, value) => sum + value, 0);
-  const totalBD = seriesBD.reduce((sum, value) => sum + value, 0);
+  const { reasons, seriesAC, seriesBD, grandTotal } = issueAnalytics.value.byReasonAndTurma;
+  const sourceReasons = issueAnalytics.value.byProcess.reasons.length
+    ? issueAnalytics.value.byProcess.reasons
+    : reasons;
+  const sourceSeriesAC = selectedProcessData.value?.seriesAC ?? seriesAC;
+  const sourceSeriesBD = selectedProcessData.value?.seriesBD ?? seriesBD;
 
-  const mappedAC =
-    metricMode.value === 'percentage'
-      ? seriesAC.map((value) => toPercentage(value, totalAC))
-      : seriesAC;
-  const mappedBD =
-    metricMode.value === 'percentage'
-      ? seriesBD.map((value) => toPercentage(value, totalBD))
-      : seriesBD;
-
-  if (viewMode.value === 'overall') {
-    const totalsCount = reasons.map((_, i) => (seriesAC[i] ?? 0) + (seriesBD[i] ?? 0));
+  if (displayMode.value === 'overall') {
+    const totalsCount = sourceReasons.map(
+      (_, index) => (sourceSeriesAC[index] ?? 0) + (sourceSeriesBD[index] ?? 0),
+    );
+    const overallTotal = selectedProcessData.value?.total ?? grandTotal;
     const totals =
       metricMode.value === 'percentage'
-        ? totalsCount.map((value) => toPercentage(value, grandTotal))
+        ? totalsCount.map((value) => toPercentage(value, overallTotal))
         : totalsCount;
+
     return {
       tooltip: {
         trigger: 'axis',
@@ -248,7 +316,7 @@ const chartOption = computed(() => {
       grid: { left: 16, right: 24, top: 18, bottom: 18, containLabel: true },
       xAxis: {
         type: 'category',
-        data: reasons,
+        data: sourceReasons,
         axisLabel: {
           color: '#17343d',
           fontSize: 11,
@@ -292,6 +360,17 @@ const chartOption = computed(() => {
     };
   }
 
+  const totalAC = sourceSeriesAC.reduce((sum, value) => sum + value, 0);
+  const totalBD = sourceSeriesBD.reduce((sum, value) => sum + value, 0);
+  const mappedAC =
+    metricMode.value === 'percentage'
+      ? sourceSeriesAC.map((value) => toPercentage(value, totalAC))
+      : sourceSeriesAC;
+  const mappedBD =
+    metricMode.value === 'percentage'
+      ? sourceSeriesBD.map((value) => toPercentage(value, totalBD))
+      : sourceSeriesBD;
+
   return {
     tooltip: {
       trigger: 'axis',
@@ -303,7 +382,7 @@ const chartOption = computed(() => {
     grid: { left: 16, right: 24, top: 18, bottom: 18, containLabel: true },
     xAxis: {
       type: 'category',
-      data: reasons,
+      data: sourceReasons,
       axisLabel: {
         color: '#17343d',
         fontSize: 11,
@@ -418,6 +497,10 @@ const chartOption = computed(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.process-select {
+  min-width: 300px;
 }
 
 .chart-shell {

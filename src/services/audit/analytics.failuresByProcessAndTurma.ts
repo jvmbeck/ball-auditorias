@@ -66,7 +66,10 @@ export async function fetchFailuresByProcessAndTurma(
 
   await Promise.all(
     collectionsToQuery.map(async (collectionName) => {
-      const failuresQuery = query(collection(db, collectionName), where('hasIssue', '==', true));
+      const failuresQuery = query(
+        collection(db, collectionName),
+        where('status', '==', 'not_updated'),
+      );
       const snapshots = await getDocs(failuresQuery);
 
       snapshots.forEach((snapshot) => {

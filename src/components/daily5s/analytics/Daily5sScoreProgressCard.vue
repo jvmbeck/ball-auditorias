@@ -5,7 +5,7 @@
         <q-icon name="show_chart" size="24px" color="primary" class="q-mr-sm" />
         <div>
           <div class="title">Pontuação auditoria diária de 5S (%)</div>
-          <div class="subtitle">{{ turmaSubtitle }}</div>
+          <div class="subtitle">{{ subtitle }}</div>
         </div>
       </div>
 
@@ -19,17 +19,12 @@
         <span>{{ error }}</span>
       </div>
 
-      <div v-else-if="!props.turma" class="state-box">
-        <q-icon name="groups" size="20px" color="grey-7" />
-        <span>Selecione a turma para visualizar o gráfico.</span>
-      </div>
-
       <div v-else>
         <div class="kpi-row q-mb-sm">
           <q-chip color="primary" text-color="white" icon="query_stats">
             {{ latestPercentage }}% ({{ latestTotal }}/{{ DAILY5S_MAX_SCORE }})
           </q-chip>
-          <span class="kpi-hint">Resultado do dia mais recente no período.</span>
+          <span class="kpi-hint">Resultado de hoje.</span>
         </div>
 
         <VChart autoresize :option="chartOption" class="chart" />
@@ -39,12 +34,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, provide, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import {
+  getTodaysDaily5sRatedProcessKeys,
+  subscribeTodaysDaily5sRatedProcessKeys,
+} from 'src/services/audit';
 import { DAILY5S_MAX_SCORE } from 'src/services/audit/analytics.daily5sCanonical';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
@@ -54,7 +53,6 @@ provide(THEME_KEY, 'light');
 const props = withDefaults(
   defineProps<{
     monthKey: string;
-    turma: 'A e C' | 'B e D' | null;
     refreshToken?: number;
   }>(),
   {
@@ -65,9 +63,16 @@ const props = withDefaults(
 const analyticsStore = useAnalyticsStore();
 const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
 const error = computed(() => analyticsStore.daily5sAnalyticsError);
+const unsubscribeRealtime = ref<(() => void) | null>(null);
+
+const subtitle = computed(() => `Progresso diário do mês sobre ${DAILY5S_MAX_SCORE} pontos`);
+
+function toPercentage(score: number): number {
+  return Number(((score / DAILY5S_MAX_SCORE) * 100).toFixed(1));
+}
 
 const scoreTrend = computed(() => {
-  if (!props.turma || analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
+  if (analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
     return {
       labels: [],
       percentages: [],
@@ -77,33 +82,72 @@ const scoreTrend = computed(() => {
     };
   }
 
-  return props.turma === 'A e C'
-    ? analyticsStore.daily5sMonthlyScoreTrendByTurma.ac
-    : analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
+  const acTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.ac;
+  const bdTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
+  const labels = acTrend.labels.length ? acTrend.labels : bdTrend.labels;
+
+  const totals = labels.map(
+    (_, index) => (acTrend.totals[index] ?? 0) + (bdTrend.totals[index] ?? 0),
+  );
+  const percentages = totals.map((score) => toPercentage(score));
+  const totalsByDate = Object.fromEntries(labels.map((date, index) => [date, totals[index] ?? 0]));
+  const percentagesByDate = Object.fromEntries(
+    labels.map((date, index) => [date, percentages[index] ?? 0]),
+  );
+
+  return {
+    labels,
+    percentages,
+    totals,
+    percentagesByDate,
+    totalsByDate,
+  };
 });
 
-const turmaSubtitle = computed(() => {
-  if (!props.turma) {
-    return 'Uma turma por vez (a turma ativa do dia)';
+function getTodayDateKey(): string {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const latestScoreIndex = computed(() => {
+  const labels = scoreTrend.value.labels;
+  const totals = scoreTrend.value.totals;
+
+  if (!labels.length || !totals.length) {
+    return -1;
   }
 
-  return `Turma ${props.turma} - progresso do mês sobre ${DAILY5S_MAX_SCORE} pontos`;
+  const todayIndex = labels.indexOf(getTodayDateKey());
+  if (todayIndex >= 0 && (totals[todayIndex] ?? 0) > 0) {
+    return todayIndex;
+  }
+
+  for (let index = totals.length - 1; index >= 0; index -= 1) {
+    if ((totals[index] ?? 0) > 0) {
+      return index;
+    }
+  }
+
+  return -1;
 });
 
 const latestTotal = computed(() => {
-  if (!scoreTrend.value.totals.length) {
+  if (latestScoreIndex.value < 0) {
     return 0;
   }
 
-  return scoreTrend.value.totals[scoreTrend.value.totals.length - 1] ?? 0;
+  return scoreTrend.value.totals[latestScoreIndex.value] ?? 0;
 });
 
 const latestPercentage = computed(() => {
-  if (!scoreTrend.value.percentages.length) {
+  if (latestScoreIndex.value < 0) {
     return 0;
   }
 
-  return scoreTrend.value.percentages[scoreTrend.value.percentages.length - 1] ?? 0;
+  return scoreTrend.value.percentages[latestScoreIndex.value] ?? 0;
 });
 
 function formatDateLabel(dateKey: string): string {
@@ -162,7 +206,7 @@ const chartOption = computed(() => ({
   },
   series: [
     {
-      name: 'Pontuacao',
+      name: 'Pontuação',
       type: 'line',
       smooth: true,
       showSymbol: true,
@@ -182,7 +226,7 @@ const chartOption = computed(() => ({
   ],
 }));
 
-async function loadScoreTrend() {
+async function loadScoreTrend(): Promise<void> {
   if (!props.monthKey) {
     return;
   }
@@ -206,12 +250,41 @@ async function refreshScoreTrend(): Promise<void> {
   }
 }
 
+async function subscribeRealtimeRefresh(): Promise<void> {
+  if (unsubscribeRealtime.value) {
+    unsubscribeRealtime.value();
+    unsubscribeRealtime.value = null;
+  }
+
+  try {
+    await getTodaysDaily5sRatedProcessKeys();
+    unsubscribeRealtime.value = subscribeTodaysDaily5sRatedProcessKeys(
+      () => {
+        void refreshScoreTrend();
+      },
+      () => {
+        // Shared error state is managed by the analytics store.
+      },
+    );
+  } catch {
+    // Shared error state is managed by the analytics store.
+  }
+}
+
 onMounted(() => {
   void loadScoreTrend();
+  void subscribeRealtimeRefresh();
+});
+
+onBeforeUnmount(() => {
+  if (unsubscribeRealtime.value) {
+    unsubscribeRealtime.value();
+    unsubscribeRealtime.value = null;
+  }
 });
 
 watch(
-  () => [props.monthKey, props.turma],
+  () => props.monthKey,
   () => {
     void loadScoreTrend();
   },

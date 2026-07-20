@@ -151,7 +151,6 @@ function buildPrinterChecksPayload(printerState: PrinterProcessState): PrinterCh
     acc[printerKey] = {
       status,
       comment: status === 'not_updated' ? comment.trim() || null : null,
-      imageUrl: null,
       imageUrls: [],
     };
 

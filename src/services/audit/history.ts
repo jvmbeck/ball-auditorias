@@ -49,7 +49,7 @@ function toHistoryItem(
     results.map((result) => [result.process, result]),
   ) as Partial<Record<DualAuditProcessKey, DualTypeAuditResultDocument>>;
 
-  const failedProcesses = results.filter((result) => result.hasIssue).length;
+  const failedProcesses = results.filter((result) => result.status === 'not_updated').length;
   const totalProcesses = results.length;
   const turma = auditDoc.turma === 'A e C' || auditDoc.turma === 'B e D' ? auditDoc.turma : null;
 
@@ -75,7 +75,7 @@ function groupDaily5sHistoryItems(
   const auditsByDayId = new Map<string, Array<DualTypeAuditDocument & { id: string }>>();
 
   auditDocs.forEach((auditDoc) => {
-    const dayId = auditDoc.auditSessionId || auditDoc.date || auditDoc.id;
+    const dayId = auditDoc.date;
     const list = auditsByDayId.get(dayId) ?? [];
     list.push(auditDoc);
     auditsByDayId.set(dayId, list);

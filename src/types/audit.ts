@@ -85,7 +85,6 @@ export type AuditProcessStatus = 'updated' | 'not_updated' | null;
 export interface PrinterCheckResult {
   status: AuditProcessStatus;
   comment?: string | null;
-  imageUrl?: string | null;
   imageUrls?: string[] | null;
 }
 
@@ -191,7 +190,7 @@ export interface Daily5sCanonicalRow {
   rating: Daily5sHeatmapValue;
   status: Exclude<AuditProcessStatus, null> | null;
   hasIssue: boolean;
-  comment: Daily5sIssueReason | null;
+  comments: Daily5sIssueReason[];
   createdAtMs: number;
 }
 
@@ -230,12 +229,26 @@ export interface Daily5sIssueAnalyticsData {
   byTurmaTime: Daily5sIssueAnalyticsViewData;
   overall: Daily5sIssueAnalyticsViewData;
   byReasonAndTurma: Daily5sIssueByReasonAndTurmaData;
+  byProcess: Daily5sIssueByProcessData;
 }
 
 export interface Daily5sIssueByReasonAndTurmaData {
   reasons: Daily5sIssueReason[];
   seriesAC: number[];
   seriesBD: number[];
+  grandTotal: number;
+}
+
+export interface Daily5sIssueByProcessEntry {
+  processKey: Daily5sAuditProcessKey;
+  seriesAC: number[];
+  seriesBD: number[];
+  total: number;
+}
+
+export interface Daily5sIssueByProcessData {
+  reasons: Daily5sIssueReason[];
+  processes: Daily5sIssueByProcessEntry[];
   grandTotal: number;
 }
 
@@ -298,7 +311,6 @@ export type UpdatableProcessStatus = Exclude<AuditProcessStatus, null>;
  * Uses date as document ID.
  */
 export interface DualTypeAuditDocument {
-  auditSessionId: string;
   date: string; // YYYY-MM-DD
   turma: 'A e C' | 'B e D';
   completedAt?: Timestamp;
@@ -312,15 +324,14 @@ export interface DualTypeAuditDocument {
  */
 export interface DualTypeAuditResultDocument {
   auditId: string; // date string (YYYY-MM-DD)
-  auditSessionId: string;
   date: string; // YYYY-MM-DD
   turma: 'A e C' | 'B e D';
   process: DualAuditProcessKey;
   status: UpdatableProcessStatus;
-  hasIssue: boolean; // status === 'not_updated'
   rating?: Daily5sRatingValue | null;
+  grade1Reason?: Daily5sIssueReason[] | null;
+  grade1Comment?: string | null;
   comment?: string | null;
-  imageUrl?: string | null;
   imageUrls?: string[] | null;
   printerChecks?: PrinterChecks | null;
   issueTargets?: PrinterCheckKey[];

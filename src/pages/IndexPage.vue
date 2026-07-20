@@ -119,17 +119,6 @@
                 @click="handleRefreshDaily5sAnalytics"
                 class="q-mr-md"
               />
-
-              <q-select
-                v-model="daily5sSelectedTurma"
-                outlined
-                dense
-                emit-value
-                map-options
-                :options="turmaOptions"
-                label="Turma"
-                class="days-select"
-              />
             </div>
           </div>
 
@@ -137,7 +126,6 @@
             <div class="chart-item">
               <Daily5sScoreProgressCard
                 :month-key="currentMonthKey"
-                :turma="daily5sSelectedTurma"
                 :refresh-token="daily5sAnalyticsRefreshToken"
               />
             </div>
@@ -168,7 +156,6 @@ const analyticsStore = useAnalyticsStore();
 const activeTab = ref<'dailyAudit' | 'checklist5s'>('dailyAudit');
 const refreshingAnalytics = ref(false);
 const selectedDays = ref<number>(30);
-const daily5sSelectedTurma = ref<'A e C' | 'B e D'>('B e D');
 const daily5sAnalyticsRefreshToken = ref(0);
 const currentMonthKey = toDateKey(new Date()).slice(0, 7);
 
@@ -178,11 +165,6 @@ const daysOptions = [
   { label: 'Últimos 30 dias', value: 30 },
   { label: 'Últimos 60 dias', value: 60 },
   { label: 'Últimos 90 dias', value: 90 },
-];
-
-const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
-  { label: 'Turma A e C', value: 'A e C' },
-  { label: 'Turma B e D', value: 'B e D' },
 ];
 
 async function handleRefreshAnalytics() {

@@ -50,6 +50,7 @@ const routes: RouteRecordRaw[] = [
     children: [{ path: '', name: 'login', component: () => import('pages/LoginPage.vue') }],
     meta: { guestOnly: true },
   },
+  { path: '/', redirect: '/login' },
 
   // Always leave this as last one,
   // but you can also remove it

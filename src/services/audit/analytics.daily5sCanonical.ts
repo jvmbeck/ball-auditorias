@@ -46,7 +46,10 @@ const ACTION_OWNER_BY_REASON: Record<Daily5sIssueReason, Daily5sActionPlanOwner>
 };
 
 const TURMA_ORDER: Daily5sTurma[] = ['A e C', 'B e D'];
-const DISPLAY_TURMAS: Daily5sTurma[] = ['B e D', 'A e C'];
+
+// Reference date: the first day of an A e C 4-day block.
+// The cycle repeats every 8 days (4 days A e C, then 4 days B e D).
+const TURMA_EPOCH = '2026-06-29'; // A e C block starts here
 
 export const DAILY5S_MAX_SCORE = 185;
 
@@ -180,12 +183,19 @@ function buildMonthDateKeys(monthKey: string): string[] {
   });
 }
 
+function getTurmaForDate(dateKey: string): Daily5sTurma {
+  const epochMs = new Date(`${TURMA_EPOCH}T00:00:00`).getTime();
+  const dateMs = new Date(`${dateKey}T00:00:00`).getTime();
+  const daysSinceEpoch = Math.round((dateMs - epochMs) / 86_400_000);
+  const blockIndex = Math.floor(daysSinceEpoch / 4) % 2;
+  return blockIndex === 0 ? 'A e C' : 'B e D';
+}
+
 function buildDisplayCategories(monthKey: string): Daily5sHeatmapCategory[] {
   const dates = buildMonthDateKeys(monthKey);
 
-  return dates.map((date, index) => {
-    const turmaIndex = Math.floor(index / 5) % DISPLAY_TURMAS.length;
-    const turma = DISPLAY_TURMAS[turmaIndex] ?? 'B e D';
+  return dates.map((date) => {
+    const turma = getTurmaForDate(date);
 
     return {
       key: `${date}|${turma}`,

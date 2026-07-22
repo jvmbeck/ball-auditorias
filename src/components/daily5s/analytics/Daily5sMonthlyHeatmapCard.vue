@@ -306,6 +306,7 @@ const chartOption = computed(() => ({
   yAxis: {
     type: 'category',
     data: heatmapState.value.processLabels,
+    inverse: true,
     axisLabel: {
       color: '#17343d',
       fontSize: 11,

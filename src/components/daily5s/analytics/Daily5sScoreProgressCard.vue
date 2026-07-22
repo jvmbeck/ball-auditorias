@@ -20,11 +20,29 @@
       </div>
 
       <div v-else>
+        <div class="legend-filter q-mb-sm">
+          <span class="legend-label">Visualização:</span>
+          <div class="legend-pills">
+            <q-btn
+              v-for="pill in turmaLegendPills"
+              :key="pill.value"
+              no-caps
+              unelevated
+              rounded
+              :class="['legend-pill', { 'legend-pill--active': selectedTurmaView === pill.value }]"
+              @click="selectedTurmaView = pill.value"
+            >
+              <span class="pill-dot" :style="{ backgroundColor: pill.color }" />
+              <span>{{ pill.label }}</span>
+            </q-btn>
+          </div>
+        </div>
+
         <div class="kpi-row q-mb-sm">
           <q-chip color="primary" text-color="white" icon="query_stats">
-            {{ latestPercentage }}% ({{ latestTotal }}/{{ DAILY5S_MAX_SCORE }})
+            {{ todayPercentage }}% ({{ todayTotal }}/{{ DAILY5S_MAX_SCORE }})
           </q-chip>
-          <span class="kpi-hint">Resultado de hoje.</span>
+          <span class="kpi-hint">{{ kpiHint }}</span>
         </div>
 
         <VChart autoresize :option="chartOption" class="chart" />
@@ -64,6 +82,17 @@ const analyticsStore = useAnalyticsStore();
 const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
 const error = computed(() => analyticsStore.daily5sAnalyticsError);
 const unsubscribeRealtime = ref<(() => void) | null>(null);
+const selectedTurmaView = ref<'combined' | 'ac' | 'bd'>('combined');
+
+const turmaLegendPills: Array<{
+  label: string;
+  value: 'combined' | 'ac' | 'bd';
+  color: string;
+}> = [
+  { label: 'A e C + B e D', value: 'combined', color: '#129e7b' },
+  { label: 'A e C', value: 'ac', color: '#1f7ae0' },
+  { label: 'B e D', value: 'bd', color: '#f28e2b' },
+];
 
 const subtitle = computed(() => `Progresso diário do mês sobre ${DAILY5S_MAX_SCORE} pontos`);
 
@@ -71,24 +100,14 @@ function toPercentage(score: number): number {
   return Number(((score / DAILY5S_MAX_SCORE) * 100).toFixed(1));
 }
 
-const scoreTrend = computed(() => {
-  if (analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
-    return {
-      labels: [],
-      percentages: [],
-      totals: [],
-      percentagesByDate: {},
-      totalsByDate: {},
-    };
-  }
-
-  const acTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.ac;
-  const bdTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
-  const labels = acTrend.labels.length ? acTrend.labels : bdTrend.labels;
-
-  const totals = labels.map(
-    (_, index) => (acTrend.totals[index] ?? 0) + (bdTrend.totals[index] ?? 0),
-  );
+function buildTotalsByDate(
+  labels: string[],
+  totals: number[],
+): {
+  totalsByDate: Record<string, number>;
+  percentagesByDate: Record<string, number>;
+  percentages: number[];
+} {
   const percentages = totals.map((score) => toPercentage(score));
   const totalsByDate = Object.fromEntries(labels.map((date, index) => [date, totals[index] ?? 0]));
   const percentagesByDate = Object.fromEntries(
@@ -96,12 +115,118 @@ const scoreTrend = computed(() => {
   );
 
   return {
-    labels,
-    percentages,
-    totals,
-    percentagesByDate,
     totalsByDate,
+    percentagesByDate,
+    percentages,
   };
+}
+
+const scoreTrend = computed(() => {
+  if (analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
+    return {
+      labels: [],
+      combined: {
+        totals: [],
+        percentages: [],
+        percentagesByDate: {},
+        totalsByDate: {},
+      },
+      ac: {
+        totals: [],
+        percentages: [],
+        percentagesByDate: {},
+        totalsByDate: {},
+      },
+      bd: {
+        totals: [],
+        percentages: [],
+        percentagesByDate: {},
+        totalsByDate: {},
+      },
+    };
+  }
+
+  const acTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.ac;
+  const bdTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
+  const labels = Array.from(new Set([...acTrend.labels, ...bdTrend.labels])).sort();
+
+  const acTotalsByDate = Object.fromEntries(
+    acTrend.labels.map((date, index) => [date, acTrend.totals[index] ?? 0]),
+  );
+  const bdTotalsByDate = Object.fromEntries(
+    bdTrend.labels.map((date, index) => [date, bdTrend.totals[index] ?? 0]),
+  );
+
+  const acTotals = labels.map((date) => acTotalsByDate[date] ?? 0);
+  const bdTotals = labels.map((date) => bdTotalsByDate[date] ?? 0);
+  const combinedTotals = labels.map((_, index) => (acTotals[index] ?? 0) + (bdTotals[index] ?? 0));
+
+  const ac = buildTotalsByDate(labels, acTotals);
+  const bd = buildTotalsByDate(labels, bdTotals);
+  const combined = buildTotalsByDate(labels, combinedTotals);
+
+  return {
+    labels,
+    combined: {
+      totals: combinedTotals,
+      percentages: combined.percentages,
+      percentagesByDate: combined.percentagesByDate,
+      totalsByDate: combined.totalsByDate,
+    },
+    ac: {
+      totals: acTotals,
+      percentages: ac.percentages,
+      percentagesByDate: ac.percentagesByDate,
+      totalsByDate: ac.totalsByDate,
+    },
+    bd: {
+      totals: bdTotals,
+      percentages: bd.percentages,
+      percentagesByDate: bd.percentagesByDate,
+      totalsByDate: bd.totalsByDate,
+    },
+  };
+});
+
+const selectedTrend = computed(() => {
+  if (selectedTurmaView.value === 'ac') {
+    return scoreTrend.value.ac;
+  }
+
+  if (selectedTurmaView.value === 'bd') {
+    return scoreTrend.value.bd;
+  }
+
+  return {
+    totals: scoreTrend.value.combined.totals,
+    percentages: scoreTrend.value.combined.percentages,
+    percentagesByDate: scoreTrend.value.combined.percentagesByDate,
+    totalsByDate: scoreTrend.value.combined.totalsByDate,
+  };
+});
+
+const selectedSeriesName = computed(() => {
+  if (selectedTurmaView.value === 'ac') {
+    return 'Pontuação A e C';
+  }
+
+  if (selectedTurmaView.value === 'bd') {
+    return 'Pontuação B e D';
+  }
+
+  return 'Pontuação A e C + B e D';
+});
+
+const selectedSeriesColor = computed(() => {
+  if (selectedTurmaView.value === 'ac') {
+    return '#1f7ae0';
+  }
+
+  if (selectedTurmaView.value === 'bd') {
+    return '#f28e2b';
+  }
+
+  return '#129e7b';
 });
 
 function getTodayDateKey(): string {
@@ -112,9 +237,11 @@ function getTodayDateKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+const todayDateKey = computed(() => getTodayDateKey());
+
 const latestScoreIndex = computed(() => {
   const labels = scoreTrend.value.labels;
-  const totals = scoreTrend.value.totals;
+  const totals = selectedTrend.value.totals;
 
   if (!labels.length || !totals.length) {
     return -1;
@@ -134,20 +261,23 @@ const latestScoreIndex = computed(() => {
   return -1;
 });
 
-const latestTotal = computed(() => {
-  if (latestScoreIndex.value < 0) {
-    return 0;
+const todayTotal = computed(() => selectedTrend.value.totalsByDate[todayDateKey.value] ?? 0);
+
+const todayPercentage = computed(() => toPercentage(todayTotal.value));
+
+const kpiHint = computed(() => {
+  if (todayTotal.value > 0) {
+    return 'Resultado de hoje.';
   }
 
-  return scoreTrend.value.totals[latestScoreIndex.value] ?? 0;
-});
-
-const latestPercentage = computed(() => {
-  if (latestScoreIndex.value < 0) {
-    return 0;
+  if (latestScoreIndex.value >= 0) {
+    const latestDate = scoreTrend.value.labels[latestScoreIndex.value] ?? '';
+    return latestDate
+      ? `Sem resultado hoje. Último registro em ${formatDateLabel(latestDate)}.`
+      : 'Sem resultado hoje.';
   }
 
-  return scoreTrend.value.percentages[latestScoreIndex.value] ?? 0;
+  return 'Sem resultado hoje.';
 });
 
 function formatDateLabel(dateKey: string): string {
@@ -206,22 +336,27 @@ const chartOption = computed(() => ({
   },
   series: [
     {
-      name: 'Pontuação',
+      name: selectedSeriesName.value,
       type: 'line',
       smooth: true,
       showSymbol: true,
       symbolSize: 7,
       itemStyle: {
-        color: '#129e7b',
+        color: selectedSeriesColor.value,
       },
       lineStyle: {
         width: 3,
-        color: '#129e7b',
+        color: selectedSeriesColor.value,
       },
       areaStyle: {
-        color: 'rgba(18, 158, 123, 0.12)',
+        color:
+          selectedTurmaView.value === 'ac'
+            ? 'rgba(31, 122, 224, 0.12)'
+            : selectedTurmaView.value === 'bd'
+              ? 'rgba(242, 142, 43, 0.12)'
+              : 'rgba(18, 158, 123, 0.12)',
       },
-      data: scoreTrend.value.percentages,
+      data: selectedTrend.value.percentages,
     },
   ],
 }));
@@ -326,6 +461,52 @@ watch(
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.legend-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.legend-label {
+  color: #5f7077;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.legend-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-pill {
+  border: 1px solid #c5d2d8;
+  color: #4e6570;
+  background: #ffffff;
+  font-weight: 600;
+  min-height: 15px;
+  padding: 0 10px;
+}
+
+.legend-pill--active {
+  border-color: #8eb9ad;
+  color: #17343d;
+  background: #edf7f3;
+}
+
+.pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.legend-pill :deep(.q-btn__content) {
+  gap: 7px;
 }
 
 .kpi-hint {

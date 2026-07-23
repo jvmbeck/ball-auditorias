@@ -1,7 +1,7 @@
 <template>
   <div class="avatar-section">
-    <q-btn round color="white" class="q-ml-md q-mt-md" dense>
-      <q-avatar size="60px" color="primary">
+    <q-btn round color="white" dense>
+      <q-avatar size="48px" color="primary">
         <div class="full-center avatar-initials">
           {{
             (authStore.profile?.name || '')

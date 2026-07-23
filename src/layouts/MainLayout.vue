@@ -8,7 +8,7 @@
             no-caps
             dense
             :to="authstore.role === 'admin' ? '/admin' : '/auditor'"
-            class="title-btn q-mt-md"
+            class="title-btn"
             aria-label="Ir para a página inicial"
           >
             Ball Auditorias

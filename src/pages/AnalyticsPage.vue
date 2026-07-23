@@ -56,12 +56,12 @@
               readonly
               outlined
               dense
-              :model-value="selectedMonthLabel"
-              label="Mês"
+              :model-value="selectedIssuesRangeLabel"
+              label="Período"
               class="month-native"
             >
               <template #prepend>
-                <q-icon name="calendar_month" />
+                <q-icon name="date_range" />
               </template>
 
               <template #append>
@@ -69,7 +69,13 @@
               </template>
 
               <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                <q-date v-model="selectedMonth" view="Months" mask="YYYY-MM" minimal />
+                <q-date
+                  v-model="selectedIssuesRange"
+                  range
+                  mask="YYYY-MM-DD"
+                  minimal
+                  :options="isDateInSelectedMonth"
+                />
               </q-popup-proxy>
             </q-input>
           </div>
@@ -77,17 +83,17 @@
           <q-btn outline color="primary" icon="refresh" label="Atualizar" @click="handleRefresh" />
         </section>
 
-        <Daily5sIssueAnalyticsCard :month-key="selectedMonth" :date-range="currentDateRange" />
+        <Daily5sIssueAnalyticsCard :month-key="selectedMonth" :date-range="issuesDateRange" />
 
         <Daily5sTop5Rating1Card
           :month-key="selectedMonth"
-          :date-range="currentDateRange"
+          :date-range="issuesDateRange"
           class="q-mt-lg"
         />
 
         <Daily5sActionPlanTableCard
           :month-key="selectedMonth"
-          :date-range="currentDateRange"
+          :date-range="issuesDateRange"
           class="q-mt-lg"
         />
       </section>
@@ -103,6 +109,13 @@ import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sM
 import Daily5sTop5Rating1Card from 'src/components/daily5s/analytics/Daily5sTop5Rating1Card.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { toDateKey } from 'src/utils/dateFormatting';
+
+interface DateRangeValue {
+  from: string;
+  to: string;
+}
+
+type DateRangeModel = DateRangeValue | string | null;
 
 function getCurrentMonthKey(): string {
   return toDateKey(new Date()).slice(0, 7);
@@ -131,10 +144,70 @@ function formatMonthLabel(monthKey: string): string {
   return `${month}/${year}`;
 }
 
+function formatDateLabel(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-');
+  if (!year || !month || !day) {
+    return dateKey;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
+function normalizeDateRangeModel(monthKey: string, model: DateRangeModel): DateRangeValue {
+  const monthBounds = getMonthDefaultRange(monthKey);
+
+  if (!model) {
+    return monthBounds;
+  }
+
+  if (typeof model === 'string') {
+    if (model >= monthBounds.from && model <= monthBounds.to) {
+      return { from: model, to: model };
+    }
+
+    return monthBounds;
+  }
+
+  const rawFrom = model.from || monthBounds.from;
+  const rawTo = model.to || model.from || monthBounds.to;
+  let from = rawFrom;
+  let to = rawTo;
+
+  if (from > to) {
+    [from, to] = [to, from];
+  }
+
+  if (to < monthBounds.from || from > monthBounds.to) {
+    return monthBounds;
+  }
+
+  const clampedFrom = from < monthBounds.from ? monthBounds.from : from;
+  const clampedTo = to > monthBounds.to ? monthBounds.to : to;
+
+  return { from: clampedFrom, to: clampedTo };
+}
+
+function formatDateRangeLabel(range: DateRangeValue): string {
+  if (range.from === range.to) {
+    return formatDateLabel(range.from);
+  }
+
+  return `${formatDateLabel(range.from)} - ${formatDateLabel(range.to)}`;
+}
+
 const analyticsStore = useAnalyticsStore();
 const selectedMonth = ref(getCurrentMonthKey());
 const selectedMonthLabel = computed(() => formatMonthLabel(selectedMonth.value));
-const currentDateRange = computed(() => getMonthDefaultRange(selectedMonth.value));
+const selectedIssuesRange = ref<DateRangeModel>(getMonthDefaultRange(selectedMonth.value));
+const issuesDateRange = computed(() =>
+  normalizeDateRangeModel(selectedMonth.value, selectedIssuesRange.value),
+);
+const selectedIssuesRangeLabel = computed(() => formatDateRangeLabel(issuesDateRange.value));
+
+function isDateInSelectedMonth(dateKey: string): boolean {
+  const normalizedDateKey = dateKey.replace(/\//g, '-');
+  return normalizedDateKey.startsWith(`${selectedMonth.value}-`);
+}
 
 async function loadMonthlyAnalytics(force = false): Promise<void> {
   await analyticsStore.loadDaily5sAnalytics(selectedMonth.value, force);
@@ -147,6 +220,7 @@ function handleRefresh(): void {
 watch(
   selectedMonth,
   () => {
+    selectedIssuesRange.value = getMonthDefaultRange(selectedMonth.value);
     void loadMonthlyAnalytics(false);
   },
   { immediate: true },

@@ -5,10 +5,10 @@
         <div>
           <div>
             <q-icon name="fact_check" size="28px" color="primary" class="q-mr-sm" />
-            <span class="title">Processos da data</span>
+            <span class="title">Processos de hoje</span>
           </div>
 
-          <div class="subtitle">Status de cada processo para a data selecionada.</div>
+          <div class="subtitle">Status de cada processo para hoje.</div>
         </div>
 
         <q-chip color="primary" text-color="white" icon="calendar_today" class="chip">
@@ -18,12 +18,12 @@
 
       <div v-if="loading" class="state-box">
         <q-spinner color="primary" size="24px" />
-        <span>Carregando processos da data...</span>
+        <span>Carregando processos...</span>
       </div>
 
       <div v-else-if="!inspectorId" class="state-box">
         <q-icon name="login" size="20px" color="grey-7" />
-        <span>Faça login para ver os processos da data.</span>
+        <span>Faça login para ver os processos de hoje.</span>
       </div>
 
       <div v-else class="table-shell">

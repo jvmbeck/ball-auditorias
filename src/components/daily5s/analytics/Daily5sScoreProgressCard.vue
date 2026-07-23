@@ -56,7 +56,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent } from 'echarts/components';
+import { GridComponent, TooltipComponent, MarkLineComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import {
   getTodaysDaily5sRatedProcessKeys,
@@ -65,7 +65,7 @@ import {
 import { DAILY5S_MAX_SCORE } from 'src/services/audit/analytics.daily5sCanonical';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, MarkLineComponent]);
 provide(THEME_KEY, 'light');
 
 const props = withDefaults(
@@ -298,6 +298,15 @@ function formatTooltipValue(value: unknown): string {
   return `${numeric}%`;
 }
 
+// Constants for goal and challenge percentages shown in the chart as dashed lines.
+const GOAL_PERCENTAGE = 75;
+const CHALLENGE_PERCENTAGE = 95;
+
+interface MarkLineData {
+  name: string;
+  yAxis: number;
+}
+
 const chartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
@@ -355,6 +364,41 @@ const chartOption = computed(() => ({
             : selectedTurmaView.value === 'bd'
               ? 'rgba(242, 142, 43, 0.12)'
               : 'rgba(18, 158, 123, 0.12)',
+      },
+      markLine: {
+        silent: true,
+        symbol: 'none',
+
+        label: {
+          show: true,
+          position: 'insideStart',
+          formatter: (params: { data: MarkLineData }) =>
+            `${params.data.name}: ${params.data.yAxis}%`,
+          padding: [0, 6],
+          color: '#555',
+          backgroundColor: '#fff',
+        },
+
+        data: [
+          {
+            name: 'Meta',
+            yAxis: GOAL_PERCENTAGE,
+            lineStyle: {
+              type: 'dashed',
+              color: '#1976d2',
+              width: 2,
+            },
+          },
+          {
+            name: 'Desafio',
+            yAxis: CHALLENGE_PERCENTAGE,
+            lineStyle: {
+              type: 'solid',
+              color: '#9c27b0',
+              width: 2,
+            },
+          },
+        ],
       },
       data: selectedTrend.value.percentages,
     },

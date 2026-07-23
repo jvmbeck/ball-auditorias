@@ -39,6 +39,11 @@
         <q-btn outline color="primary" icon="refresh" label="Atualizar" @click="handleRefresh" />
       </section>
 
+      <Daily5sScoreProgressCard
+        :month-key="selectedMonth"
+        :refresh-token="daily5sAnalyticsRefreshToken"
+        class="q-mb-lg"
+      />
       <Daily5sMonthlyHeatmapCard />
 
       <section class="issues-section q-mt-xl">
@@ -107,6 +112,7 @@ import Daily5sActionPlanTableCard from 'src/components/daily5s/analytics/Daily5s
 import Daily5sIssueAnalyticsCard from 'src/components/daily5s/analytics/Daily5sIssueAnalyticsCard.vue';
 import Daily5sMonthlyHeatmapCard from 'src/components/daily5s/analytics/Daily5sMonthlyHeatmapCard.vue';
 import Daily5sTop5Rating1Card from 'src/components/daily5s/analytics/Daily5sTop5Rating1Card.vue';
+import Daily5sScoreProgressCard from 'src/components/daily5s/analytics/Daily5sScoreProgressCard.vue';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { toDateKey } from 'src/utils/dateFormatting';
 
@@ -114,6 +120,8 @@ interface DateRangeValue {
   from: string;
   to: string;
 }
+
+const daily5sAnalyticsRefreshToken = ref(0);
 
 type DateRangeModel = DateRangeValue | string | null;
 

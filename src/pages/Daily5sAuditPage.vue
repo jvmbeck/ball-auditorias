@@ -152,6 +152,7 @@ import {
   DAILY5S_FRONTEND_PROCESS_DEFINITIONS,
   DAILY5S_PROCESS_DEFINITIONS,
 } from 'src/services/audit/daily5sDefinitions';
+import { getTurmaForDate } from 'src/services/audit/analytics.daily5sCanonical';
 import { useDaily5sAuditStore } from 'src/stores/daily5sAudit.store';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
 
@@ -186,6 +187,19 @@ const selectedTurma = computed<'A e C' | 'B e D' | null>({
   set: (value) => daily5sStore.setTurma(value),
 });
 
+function isDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function prefillTurmaFromDate(dateKey: string): void {
+  if (!isDateKey(dateKey)) {
+    return;
+  }
+
+  daily5sStore.setTurma(getTurmaForDate(dateKey));
+  console.log(`Prefilled turma for date ${dateKey}: ${getTurmaForDate(dateKey)}`);
+}
+
 async function onAuditDateChange(value: string | number | null): Promise<void> {
   if (typeof value !== 'string' || !value) {
     return;
@@ -195,7 +209,13 @@ async function onAuditDateChange(value: string | number | null): Promise<void> {
 
   try {
     daily5sStore.setAuditDate(value);
+    prefillTurmaFromDate(value);
     await daily5sStore.initialize();
+
+    if (!turma.value) {
+      prefillTurmaFromDate(value);
+    }
+
     ratedProcessesRefreshToken.value += 1;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -284,7 +304,12 @@ async function finishAudit() {
 
 onMounted(async () => {
   try {
+    daily5sStore.setAuditDate(todayDate);
     await daily5sStore.initialize();
+
+    if (!turma.value) {
+      prefillTurmaFromDate(selectedAuditDate.value);
+    }
 
     if (daily5sStore.consumeDayRolloverNotice()) {
       $q.notify({

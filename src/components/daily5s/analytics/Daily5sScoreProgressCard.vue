@@ -289,15 +289,6 @@ function formatDateLabel(dateKey: string): string {
   return `${day}/${month}`;
 }
 
-function formatTooltipValue(value: unknown): string {
-  const numeric = typeof value === 'number' ? value : Number(value);
-  if (Number.isNaN(numeric)) {
-    return '0%';
-  }
-
-  return `${numeric}%`;
-}
-
 // Constants for goal and challenge percentages shown in the chart as dashed lines.
 const GOAL_PERCENTAGE = 75;
 const CHALLENGE_PERCENTAGE = 95;
@@ -307,10 +298,30 @@ interface MarkLineData {
   yAxis: number;
 }
 
+interface TooltipPoint {
+  axisValue: string;
+  dataIndex: number;
+  marker: string;
+  seriesName: string;
+  value: number;
+}
+
 const chartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
-    valueFormatter: (value: unknown) => formatTooltipValue(value),
+    formatter: (params: TooltipPoint[]) => {
+      const point = params[0];
+
+      if (!point) return '';
+
+      const total = selectedTrend.value.totals[point.dataIndex] ?? 0;
+
+      return `
+    ${point.axisValue}<br/>
+    ${point.marker}${point.seriesName}: <b>${point.value}%</b><br/>
+    Pontuação: <b>${total}/${DAILY5S_MAX_SCORE}</b>
+  `;
+    },
   },
   grid: {
     left: 16,

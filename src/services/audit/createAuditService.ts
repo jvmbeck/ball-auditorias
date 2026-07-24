@@ -10,6 +10,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import type {
   AuditServiceConfig,
+  Daily5sAuditProcessKey,
   Daily5sIssueReason,
   Daily5sRatingValue,
   DualAuditProcessKey,
@@ -27,6 +28,7 @@ interface UpdateProcessOptions {
   rating?: Daily5sRatingValue;
   grade1Reason?: Daily5sIssueReason[] | null;
   grade1Comment?: string | null;
+  inspectorId?: string;
 }
 
 function normalizeImageUrls(imageUrls: unknown): string[] {
@@ -202,6 +204,28 @@ export function createAuditService(config: AuditServiceConfig) {
     turma: 'A e C' | 'B e D',
     inspector: string,
   ): Promise<string> {
+    if (config.auditCollection === 'daily5sAudits') {
+      const auditRef = doc(db, config.auditCollection, date);
+      const snapshot = await getDoc(auditRef);
+
+      if (!snapshot.exists()) {
+        const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & {
+          createdAt: FieldValue;
+        } = {
+          date,
+          turma,
+          inspector,
+          aggregateGrades: {},
+          completedProcesses: 0,
+          createdAt: serverTimestamp(),
+        };
+
+        await setDoc(auditRef, daily5sPayload);
+      }
+
+      return date;
+    }
+
     const payload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } = {
       date,
       turma,
@@ -238,7 +262,34 @@ export function createAuditService(config: AuditServiceConfig) {
     imageFiles: File[] | null = null,
     options?: UpdateProcessOptions,
   ): Promise<void> {
-    const resultId = `${auditId}_${processKey}`;
+    const isDaily5s = config.resultsCollection === 'daily5sProcessResults';
+    const normalizedAuditId = isDaily5s ? auditDate : auditId;
+
+    if (isDaily5s) {
+      const auditRef = doc(db, config.auditCollection, auditDate);
+      const snapshot = await getDoc(auditRef);
+
+      if (!snapshot.exists()) {
+        if (!options?.inspectorId) {
+          throw new Error('Cannot create Daily 5S audit without inspector ID.');
+        }
+
+        const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & {
+          createdAt: FieldValue;
+        } = {
+          date: auditDate,
+          turma,
+          inspector: options.inspectorId,
+          aggregateGrades: {},
+          completedProcesses: 0,
+          createdAt: serverTimestamp(),
+        };
+
+        await setDoc(auditRef, daily5sPayload, { merge: true });
+      }
+    }
+
+    const resultId = `${normalizedAuditId}_${processKey}`;
     const resultRef = doc(db, config.resultsCollection, resultId);
     const existingResultSnapshot = await getDoc(resultRef);
     const existingResult = existingResultSnapshot.exists()
@@ -391,7 +442,7 @@ export function createAuditService(config: AuditServiceConfig) {
     const normalizedGrade1Comment = hasIssue ? options?.grade1Comment?.trim() || null : null;
 
     const resultPayloadBase: DualTypeAuditResultDocument = {
-      auditId,
+      auditId: normalizedAuditId,
       date: auditDate,
       turma,
       process: processKey,
@@ -416,6 +467,31 @@ export function createAuditService(config: AuditServiceConfig) {
           };
 
     await setDoc(resultRef, resultPayload, { merge: true });
+
+    if (isDaily5s) {
+      const grade = options?.rating ?? (status === 'not_updated' ? 1 : 5);
+      const auditRef = doc(db, config.auditCollection, auditDate);
+      const auditSnapshot = await getDoc(auditRef);
+      const existing = auditSnapshot.exists()
+        ? (auditSnapshot.data() as Partial<DualTypeAuditDocument>)
+        : null;
+
+      const aggregateGrades = {
+        ...(existing?.aggregateGrades ?? {}),
+        [processKey]: grade,
+      } as Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>;
+
+      await setDoc(
+        auditRef,
+        {
+          date: auditDate,
+          turma,
+          aggregateGrades,
+          completedProcesses: Object.keys(aggregateGrades).length,
+        },
+        { merge: true },
+      );
+    }
   }
 
   /**

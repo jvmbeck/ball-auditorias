@@ -6,6 +6,7 @@ import {
   deriveDaily5sMonthlyHeatmap,
   deriveDaily5sMonthlyScoreTrend,
   deriveDaily5sTopRating1ByProcess,
+  fetchDaily5sAggregatedMonthlyData,
   fetchDaily5sCanonicalMonthlyData,
   fetchFailuresByProcess,
   fetchFailuresByProcessAndTurma,
@@ -102,6 +103,7 @@ export const useAnalyticsStore = defineStore(
     const processFailureRates = ref<ProcessFailureRatesData>(EMPTY_PROCESS_FAILURE_RATES);
 
     const daily5sCanonical = ref<Daily5sCanonicalMonthlyData>(EMPTY_DAILY5S_CANONICAL);
+    const daily5sGradesCanonical = ref<Daily5sCanonicalMonthlyData>(EMPTY_DAILY5S_CANONICAL);
     const daily5sMonthlyHeatmap = ref<Daily5sMonthlyHeatmapData>(EMPTY_DAILY5S_MONTHLY_HEATMAP);
     const daily5sMonthlyScoreTrendByTurma = ref<Daily5sMonthlyScoreTrendByTurmaData>(
       EMPTY_DAILY5S_SCORE_TRENDS_BY_TURMA,
@@ -497,12 +499,12 @@ export const useAnalyticsStore = defineStore(
       endDateKey?: string,
       topN = 5,
     ): Daily5sRating1ByProcessData {
-      if (!daily5sCanonical.value.monthKey) {
+      if (!daily5sGradesCanonical.value.monthKey) {
         return { labels: [], data: [], total: 0 };
       }
 
       return deriveDaily5sTopRating1ByProcess(
-        daily5sCanonical.value,
+        daily5sGradesCanonical.value,
         startDateKey,
         endDateKey,
         topN,
@@ -521,7 +523,8 @@ export const useAnalyticsStore = defineStore(
     }
 
     async function loadDaily5sAnalytics(monthKey: string, force = false): Promise<void> {
-      const hasCachedData = daily5sCanonical.value.rows.length > 0;
+      const hasCachedData =
+        daily5sGradesCanonical.value.rows.length > 0 || daily5sCanonical.value.rows.length > 0;
 
       if (
         !force &&
@@ -541,17 +544,21 @@ export const useAnalyticsStore = defineStore(
         daily5sAnalyticsError.value = null;
 
         try {
-          const canonical = await fetchDaily5sCanonicalMonthlyData(monthKey);
+          const [gradesCanonical, detailsCanonical] = await Promise.all([
+            fetchDaily5sAggregatedMonthlyData(monthKey),
+            fetchDaily5sCanonicalMonthlyData(monthKey),
+          ]);
 
-          daily5sCanonical.value = canonical;
-          daily5sMonthlyHeatmap.value = deriveDaily5sMonthlyHeatmap(canonical);
+          daily5sCanonical.value = detailsCanonical;
+          daily5sGradesCanonical.value = gradesCanonical;
+          daily5sMonthlyHeatmap.value = deriveDaily5sMonthlyHeatmap(gradesCanonical);
           daily5sMonthlyScoreTrendByTurma.value = {
-            monthKey: canonical.monthKey,
-            ac: deriveDaily5sMonthlyScoreTrend(canonical, 'A e C'),
-            bd: deriveDaily5sMonthlyScoreTrend(canonical, 'B e D'),
+            monthKey: gradesCanonical.monthKey,
+            ac: deriveDaily5sMonthlyScoreTrend(gradesCanonical, 'A e C'),
+            bd: deriveDaily5sMonthlyScoreTrend(gradesCanonical, 'B e D'),
           };
 
-          daily5sMonthlyHeatmapMonth.value = canonical.monthKey;
+          daily5sMonthlyHeatmapMonth.value = gradesCanonical.monthKey;
           daily5sAnalyticsLastFetchedAt.value = Date.now();
         } catch (err: unknown) {
           const message =
@@ -577,6 +584,7 @@ export const useAnalyticsStore = defineStore(
       failuresByProcess,
       processFailureRates,
       daily5sCanonical,
+      daily5sGradesCanonical,
       daily5sMonthlyHeatmap,
       daily5sMonthlyScoreTrendByTurma,
       overTimeLoading,
@@ -643,6 +651,7 @@ export const useAnalyticsStore = defineStore(
         'byProcessLastFetchedAt',
         'processFailureRateLastFetchedAt',
         'daily5sCanonical',
+        'daily5sGradesCanonical',
         'daily5sMonthlyHeatmap',
         'daily5sMonthlyScoreTrendByTurma',
         'daily5sAnalyticsLastFetchedAt',

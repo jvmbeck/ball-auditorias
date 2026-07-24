@@ -1,5 +1,5 @@
 import { db } from 'boot/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import {
   DAILY5S_ISSUE_REASONS,
@@ -12,6 +12,7 @@ import type {
   Daily5sActionPlanData,
   Daily5sActionPlanOwner,
   Daily5sActionPlanRow,
+  Daily5sAuditProcessKey,
   Daily5sCanonicalMonthlyData,
   Daily5sCanonicalRow,
   Daily5sHeatmapCategory,
@@ -25,9 +26,12 @@ import type {
   Daily5sIssueByReasonAndTurmaData,
   Daily5sIssueReason,
   Daily5sMonthlyHeatmapData,
+  Daily5sRatingValue,
   Daily5sRating1ByProcessData,
   Daily5sScoreTrendData,
   Daily5sTurma,
+  DualTypeAuditDocument,
+  DualTypeAuditResultDocument,
 } from 'src/types/audit';
 import { toDateKey } from 'src/utils/dateFormatting';
 
@@ -129,6 +133,80 @@ function normalizeReasons(grade1Reason: unknown, legacyComment: unknown): Daily5
   }
 
   return [...normalized];
+}
+
+function normalizeAggregateGrades(
+  value: unknown,
+): Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const normalized: Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>> = {};
+
+  Object.entries(value as Record<string, unknown>).forEach(([processKey, grade]) => {
+    if (!isDaily5sProcessKey(processKey)) {
+      return;
+    }
+
+    if (grade === 1 || grade === 3 || grade === 5) {
+      normalized[processKey] = grade;
+    }
+  });
+
+  return normalized;
+}
+
+async function migrateLegacyAuditAggregate(
+  auditId: string,
+): Promise<Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>> {
+  const resultsQuery = query(
+    collection(db, 'daily5sProcessResults'),
+    where('auditId', '==', auditId),
+  );
+  const resultSnapshots = await getDocs(resultsQuery);
+
+  const latestByProcess = new Map<
+    Daily5sAuditProcessKey,
+    { rating: Daily5sRatingValue; createdAtMs: number }
+  >();
+
+  resultSnapshots.forEach((snapshot) => {
+    const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
+
+    if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
+      return;
+    }
+
+    const rating = normalizeRating(data.rating, data.status);
+    if (rating !== 1 && rating !== 3 && rating !== 5) {
+      return;
+    }
+
+    const createdAtMs = getTimestampMs(data.createdAt);
+    const current = latestByProcess.get(data.process);
+
+    if (!current || createdAtMs >= current.createdAtMs) {
+      latestByProcess.set(data.process, { rating, createdAtMs });
+    }
+  });
+
+  const aggregateGrades: Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>> = {};
+  latestByProcess.forEach((value, processKey) => {
+    aggregateGrades[processKey] = value.rating;
+  });
+
+  // TODO: Remove this migration once all legacy daily5sAudits docs have aggregateGrades backfilled.
+  await setDoc(
+    doc(db, 'daily5sAudits', auditId),
+    {
+      aggregateGrades,
+      completedProcesses: Object.keys(aggregateGrades).length,
+    },
+    { merge: true },
+  );
+
+  return aggregateGrades;
 }
 
 function sortBuckets(
@@ -298,6 +376,63 @@ export async function fetchDaily5sCanonicalMonthlyData(
       createdAtMs: getTimestampMs(data.createdAt),
     });
   });
+
+  return {
+    monthKey: normalizedMonthKey,
+    startKey,
+    endKey,
+    rows,
+  };
+}
+
+export async function fetchDaily5sAggregatedMonthlyData(
+  monthKey: string,
+): Promise<Daily5sCanonicalMonthlyData> {
+  const { startKey, endKey, monthKey: normalizedMonthKey } = toMonthBounds(monthKey);
+
+  const auditsQuery = query(
+    collection(db, 'daily5sAudits'),
+    where('date', '>=', startKey),
+    where('date', '<=', endKey),
+  );
+  const auditSnapshots = await getDocs(auditsQuery);
+
+  const rows: Daily5sCanonicalRow[] = [];
+
+  for (const snapshot of auditSnapshots.docs) {
+    const data = snapshot.data() as Partial<DualTypeAuditDocument>;
+    const date = typeof data.date === 'string' ? data.date : null;
+    const turma = data.turma === 'A e C' || data.turma === 'B e D' ? data.turma : null;
+
+    if (!date || !turma) {
+      continue;
+    }
+
+    let aggregateGrades = normalizeAggregateGrades(data.aggregateGrades);
+    if (data.aggregateGrades == null) {
+      aggregateGrades = await migrateLegacyAuditAggregate(snapshot.id);
+    }
+
+    const createdAtMs = getTimestampMs(data.createdAt);
+
+    Object.entries(aggregateGrades).forEach(([processKey, rating]) => {
+      if (!isDaily5sProcessKey(processKey) || (rating !== 1 && rating !== 3 && rating !== 5)) {
+        return;
+      }
+
+      rows.push({
+        id: `${snapshot.id}_${processKey}`,
+        date,
+        turma,
+        process: processKey,
+        rating,
+        status: rating === 1 ? 'not_updated' : 'updated',
+        hasIssue: rating === 1,
+        comments: [],
+        createdAtMs,
+      });
+    });
+  }
 
   return {
     monthKey: normalizedMonthKey,

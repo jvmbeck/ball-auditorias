@@ -316,6 +316,8 @@ export interface DualTypeAuditDocument {
   completedAt?: Timestamp;
   inspector: string; // userId
   createdAt: Timestamp;
+  aggregateGrades?: Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>;
+  completedProcesses?: number;
 }
 
 /**

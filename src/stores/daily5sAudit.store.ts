@@ -34,14 +34,6 @@ function getTodayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
-function createDaily5sAuditId(dayId: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${dayId}_${crypto.randomUUID()}`;
-  }
-
-  return `${dayId}_${Date.now()}`;
-}
-
 function buildInitialProcessState(): Daily5sProcessState {
   return DAILY5S_KEYS.reduce((acc, key) => {
     acc[key] = { rating: null, grade1Reason: [], grade1Comment: '' };
@@ -147,7 +139,7 @@ export const useDaily5sAuditStore = defineStore(
         draftAuditorId.value && draftAuditorId.value !== auditorId,
       );
       const isDifferentDay = Boolean(draftDate.value && draftDate.value !== activeDate);
-      const hasStaleAuditId = Boolean(auditId.value && !auditId.value.startsWith(activeDate));
+      const hasStaleAuditId = Boolean(auditId.value && auditId.value !== activeDate);
 
       if (!isDifferentAuditor && !isDifferentDay && !hasStaleAuditId) {
         return;
@@ -276,7 +268,7 @@ export const useDaily5sAuditStore = defineStore(
       }
 
       const createdAuditId = await daily5sAuditService.createAudit(
-        createDaily5sAuditId(selectedAuditDate.value),
+        selectedAuditDate.value,
         selectedAuditDate.value,
         turma.value,
         auditorId,
@@ -290,6 +282,12 @@ export const useDaily5sAuditStore = defineStore(
     }
 
     async function persistProcess(processKey: Daily5sAuditProcessKey): Promise<void> {
+      const auditorId = authStore.firebaseUser?.uid;
+
+      if (!auditorId) {
+        throw new Error('Cannot save daily 5S process: no authenticated user.');
+      }
+
       if (!selectedProcessKeys.value.includes(processKey)) {
         throw new Error('Selecione o processo antes de salvar a avaliacao.');
       }
@@ -336,6 +334,7 @@ export const useDaily5sAuditStore = defineStore(
               ? normalizedReasons.filter((reason) => isDaily5sIssueReason(reason))
               : null,
           grade1Comment: rating === 1 ? trimmedGrade1Comment || null : null,
+          inspectorId: auditorId,
         },
       );
 

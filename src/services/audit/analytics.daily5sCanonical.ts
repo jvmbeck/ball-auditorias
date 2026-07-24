@@ -261,7 +261,7 @@ function buildMonthDateKeys(monthKey: string): string[] {
   });
 }
 
-function getTurmaForDate(dateKey: string): Daily5sTurma {
+export function getTurmaForDate(dateKey: string): Daily5sTurma {
   const epochMs = new Date(`${TURMA_EPOCH}T00:00:00`).getTime();
   const dateMs = new Date(`${dateKey}T00:00:00`).getTime();
   const daysSinceEpoch = Math.round((dateMs - epochMs) / 86_400_000);

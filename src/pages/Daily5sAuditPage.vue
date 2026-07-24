@@ -200,7 +200,7 @@ function prefillTurmaFromDate(dateKey: string): void {
   console.log(`Prefilled turma for date ${dateKey}: ${getTurmaForDate(dateKey)}`);
 }
 
-async function onAuditDateChange(value: string | number | null): Promise<void> {
+function onAuditDateChange(value: string | number | null): void {
   if (typeof value !== 'string' || !value) {
     return;
   }
@@ -210,7 +210,7 @@ async function onAuditDateChange(value: string | number | null): Promise<void> {
   try {
     daily5sStore.setAuditDate(value);
     prefillTurmaFromDate(value);
-    await daily5sStore.initialize();
+    daily5sStore.initialize();
 
     if (!turma.value) {
       prefillTurmaFromDate(value);
@@ -302,21 +302,12 @@ async function finishAudit() {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   try {
     daily5sStore.setAuditDate(todayDate);
-    await daily5sStore.initialize();
+    daily5sStore.initialize();
 
-    if (!turma.value) {
-      prefillTurmaFromDate(selectedAuditDate.value);
-    }
-
-    if (daily5sStore.consumeDayRolloverNotice()) {
-      $q.notify({
-        type: 'info',
-        message: 'Rascunho anterior encerrado. Inicie a auditoria Daily 5S de hoje.',
-      });
-    }
+    prefillTurmaFromDate(selectedAuditDate.value);
   } catch (err: unknown) {
     pageError.value = err instanceof Error ? err.message : String(err);
   }

@@ -317,9 +317,9 @@ const chartOption = computed(() => ({
       const total = selectedTrend.value.totals[point.dataIndex] ?? 0;
 
       return `
-    ${point.axisValue}<br/>
-    ${point.marker}${point.seriesName}: <b>${point.value}%</b><br/>
-    Pontuação: <b>${total}/${DAILY5S_MAX_SCORE}</b>
+    ${point.axisValue} - Pontuação<br/>
+    Porcentagem: <b>${point.value}%</b><br/>
+    Soma: <b>${total}/${DAILY5S_MAX_SCORE}</b>
   `;
     },
   },

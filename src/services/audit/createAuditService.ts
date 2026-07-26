@@ -230,6 +230,32 @@ export function createAuditService(config: AuditServiceConfig) {
     return date;
   }
 
+  async function createAudit(
+    auditId: string,
+    date: string,
+    turma: 'A e C' | 'B e D',
+    inspector: string,
+  ): Promise<string> {
+    if (config.auditCollection === 'daily5sAudits') {
+      const auditRef = doc(db, config.auditCollection, date);
+      const snapshot = await getDoc(auditRef);
+      if (!snapshot.exists()) {
+        const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } =
+          {
+            date,
+            turma,
+            inspector,
+            aggregateGrades: {},
+            completedProcesses: 0,
+            createdAt: serverTimestamp(),
+          };
+        await setDoc(auditRef, daily5sPayload);
+      }
+      return date;
+    }
+    return auditId;
+  }
+
   /**
    * Updates a single process in an audit and creates a result document.
    *
@@ -506,6 +532,7 @@ export function createAuditService(config: AuditServiceConfig) {
   // Public API
   return {
     ensureAudit,
+    createAudit,
     updateProcess,
     completeAudit,
     uploadImage,

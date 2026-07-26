@@ -12,13 +12,13 @@ import { useAuthStore } from 'stores/auth.store';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 // Firebase's API are public by design, rules are set so unauthenticated users can't read/write data.
 const firebaseConfig = {
-  apiKey: 'AIzaSyAnmFT9TctviLXpaI6W3fPxvIDwFCE-qg4',
-  authDomain: 'ball-auditorias.firebaseapp.com',
-  projectId: 'ball-auditorias',
-  storageBucket: 'ball-auditorias.firebasestorage.app',
-  messagingSenderId: '515760332872',
-  appId: '1:515760332872:web:89be1e95ed92d03d47b87d',
-  measurementId: 'G-E6EQ15GKCS',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase

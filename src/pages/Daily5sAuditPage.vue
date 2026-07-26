@@ -26,16 +26,7 @@
         </div>
 
         <div class="col-12 col-md-3">
-          <q-select
-            v-model="selectedTurma"
-            outlined
-            dense
-            emit-value
-            map-options
-            options-dense
-            :options="turmaOptions"
-            label="Turma responsável"
-          />
+          <q-select v-model="selectedTurma" outlined dense disabled label="Turma responsável" />
         </div>
 
         <div class="col-12 col-md-3">
@@ -69,30 +60,9 @@
         </div>
       </section>
 
-      <section class="progress-card q-mb-lg">
-        <div class="progress-header">
-          <h3 class="progress-title">Progresso Daily 5S</h3>
-          <q-chip color="primary" text-color="white" icon="assignment_turned_in">
-            {{ ratedCount }} / {{ selectedCount }} processos avaliados
-          </q-chip>
-        </div>
-
-        <q-linear-progress
-          rounded
-          size="12px"
-          color="positive"
-          track-color="grey-3"
-          :value="selectedCount ? ratedCount / selectedCount : 0"
-        />
-      </section>
-
-      <q-banner v-if="pageError" rounded class="q-mb-md bg-negative text-white" inline-actions>
-        {{ pageError }}
-      </q-banner>
-
       <div v-if="!selectedCount" class="empty-selection q-pa-lg q-mb-lg">
         <q-icon name="playlist_add" size="36px" color="primary" />
-        <p class="empty-text">Selecione pelo menos um processo para iniciar a avaliacao.</p>
+        <p class="empty-text">Selecione pelo menos um processo para iniciar a avaliação.</p>
       </div>
 
       <div v-else class="row q-col-gutter-lg q-mb-xl">
@@ -100,7 +70,6 @@
           v-for="process in selectedProcessDefinitions"
           :key="process.key"
           class="col-12 col-md-6 col-xl-4"
-          :class="{ 'process-card-disabled': !selectedTurma }"
         >
           <Daily5sProcessCard
             :process-key="process.key"
@@ -119,10 +88,7 @@
       </div>
 
       <section class="q-mb-lg">
-        <Daily5sRatedProcessesCard
-          :refresh-token="ratedProcessesRefreshToken"
-          :audit-date="selectedAuditDate"
-        />
+        <Daily5sRatedProcessesCard :audit-date="selectedAuditDate" />
       </section>
 
       <section class="footer-actions">
@@ -131,7 +97,6 @@
           color="positive"
           unelevated
           label="Finalizar Auditoria Daily 5S"
-          :disable="!selectedTurma || !allSelectedValid || isBusy"
           :loading="loading"
           @click="finishAudit"
         />
@@ -168,38 +133,20 @@ const {
   processFiles,
   savedProcesses,
   loading,
-  allSelectedValid,
   selectedCount,
-  ratedCount,
 } = storeToRefs(daily5sStore);
 
 const pageError = ref<string | null>(null);
-const ratedProcessesRefreshToken = ref(0);
 const todayDate = new Date().toISOString().slice(0, 10);
-
-const turmaOptions: Array<{ label: string; value: 'A e C' | 'B e D' }> = [
-  { label: 'A e C', value: 'A e C' },
-  { label: 'B e D', value: 'B e D' },
-];
 
 const selectedTurma = computed<'A e C' | 'B e D' | null>({
   get: () => turma.value,
   set: (value) => daily5sStore.setTurma(value),
 });
 
-function isDateKey(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
 function prefillTurmaFromDate(dateKey: string): void {
-  if (!isDateKey(dateKey)) {
-    return;
-  }
-
   daily5sStore.setTurma(getTurmaForDate(dateKey));
-  console.log(`Prefilled turma for date ${dateKey}: ${getTurmaForDate(dateKey)}`);
 }
-
 function onAuditDateChange(value: string | number | null): void {
   if (typeof value !== 'string' || !value) {
     return;
@@ -211,12 +158,6 @@ function onAuditDateChange(value: string | number | null): void {
     daily5sStore.setAuditDate(value);
     prefillTurmaFromDate(value);
     daily5sStore.initialize();
-
-    if (!turma.value) {
-      prefillTurmaFromDate(value);
-    }
-
-    ratedProcessesRefreshToken.value += 1;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     pageError.value = message;
@@ -258,8 +199,6 @@ const selectedProcessDefinitions = computed(() =>
   DAILY5S_PROCESS_DEFINITIONS.filter((process) => selectedProcessKeys.value.includes(process.key)),
 );
 
-const isBusy = computed(() => loading.value);
-
 function onFrontEndProcessesChange(keys: Daily5sAuditProcessKey[]) {
   const nextSelection = [...keys, ...selectedBackEndProcesses.value];
   daily5sStore.setSelectedProcesses(nextSelection);
@@ -275,7 +214,6 @@ async function saveCurrentProcess(processKey: Daily5sAuditProcessKey): Promise<v
 
   try {
     await daily5sStore.saveProcess(processKey);
-    ratedProcessesRefreshToken.value += 1;
     $q.notify({
       type: 'positive',
       message: `Processo ${processKey} salvo com sucesso.`,
@@ -288,18 +226,7 @@ async function saveCurrentProcess(processKey: Daily5sAuditProcessKey): Promise<v
 }
 
 async function finishAudit() {
-  pageError.value = null;
-
-  try {
-    await daily5sStore.finishAudit();
-    ratedProcessesRefreshToken.value += 1;
-    $q.notify({ type: 'positive', message: 'Auditoria Daily 5S concluida com sucesso.' });
-    await router.push({ name: 'audit-history' });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    pageError.value = message;
-    $q.notify({ type: 'negative', message });
-  }
+  await router.push({ name: 'auditor-home' });
 }
 
 onMounted(() => {

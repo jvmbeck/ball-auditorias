@@ -1,12 +1,7 @@
 import { computed, reactive, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { useAuthStore } from './auth.store';
-import {
-  DAILY5S_PROCESS_DEFINITIONS,
-  daily5sAuditService,
-  getDaily5sResultsForAudit,
-  getDaily5sStatusByDate,
-} from 'src/services/audit';
+import { DAILY5S_PROCESS_DEFINITIONS, daily5sAuditService } from 'src/services/audit';
 import { isDaily5sIssueReason } from 'src/services/audit/daily5sDefinitions';
 import type {
   Daily5sAuditProcessKey,
@@ -59,409 +54,240 @@ function toStatus(rating: Daily5sRatingValue): UpdatableProcessStatus {
   return rating === 1 ? 'not_updated' : 'updated';
 }
 
-export const useDaily5sAuditStore = defineStore(
-  'daily5sAudit',
-  () => {
-    const authStore = useAuthStore();
+export const useDaily5sAuditStore = defineStore('daily5sAudit', () => {
+  const authStore = useAuthStore();
 
-    const auditId = ref<string | null>(null);
-    const turma = ref<'A e C' | 'B e D' | null>(null);
-    const selectedAuditDate = ref<string>(getTodayKey());
-    const selectedProcessKeys = ref<Daily5sAuditProcessKey[]>([]);
+  const auditId = ref<string | null>(null);
+  const turma = ref<'A e C' | 'B e D' | null>(null);
+  const selectedAuditDate = ref<string>(getTodayKey());
+  const selectedProcessKeys = ref<Daily5sAuditProcessKey[]>([]);
 
-    const processState = reactive<Daily5sProcessState>(buildInitialProcessState());
-    const processFiles = reactive<Daily5sProcessFiles>(buildInitialProcessFiles());
-    const savedProcesses = reactive<Daily5sSavedState>(buildInitialSavedState());
+  const processState = reactive<Daily5sProcessState>(buildInitialProcessState());
+  const processFiles = reactive<Daily5sProcessFiles>(buildInitialProcessFiles());
+  const savedProcesses = reactive<Daily5sSavedState>(buildInitialSavedState());
 
-    const loading = ref(false);
-    const error = ref<string | null>(null);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
 
-    const draftDate = ref<string | null>(null);
-    const draftAuditorId = ref<string | null>(null);
-    const draftCompleted = ref(false);
-    const draftCompletedAuditId = ref<string | null>(null);
-    const dayRolloverNotice = ref(false);
+  const selectedCount = computed(() => selectedProcessKeys.value.length);
 
-    const selectedCount = computed(() => selectedProcessKeys.value.length);
+  const ratedCount = computed(
+    () => selectedProcessKeys.value.filter((key) => processState[key]?.rating !== null).length,
+  );
 
-    const ratedCount = computed(
-      () => selectedProcessKeys.value.filter((key) => processState[key]?.rating !== null).length,
-    );
+  const allSelectedValid = computed(() => {
+    if (!selectedProcessKeys.value.length) {
+      return false;
+    }
 
-    const allSelectedValid = computed(() => {
-      if (!selectedProcessKeys.value.length) {
+    return selectedProcessKeys.value.every((key) => {
+      const entry = processState[key];
+      if (!entry || entry.rating === null) {
+        return false;
+      }
+      const { rating, grade1Reason } = entry;
+      if (rating === null) {
         return false;
       }
 
-      return selectedProcessKeys.value.every((key) => {
-        const entry = processState[key];
-        if (!entry || entry.rating === null) {
-          return false;
-        }
-        const { rating, grade1Reason } = entry;
-        if (rating === null) {
-          return false;
-        }
+      if (rating !== 1) {
+        return true;
+      }
 
-        if (rating !== 1) {
-          return true;
-        }
-
-        return grade1Reason.length > 0 && processFiles[key].length > 0;
-      });
+      return grade1Reason.length > 0 && processFiles[key].length > 0;
     });
+  });
 
-    function clearProcessStates(): void {
-      DAILY5S_KEYS.forEach((key) => {
-        processState[key] = { rating: null, grade1Reason: [], grade1Comment: '' };
-        processFiles[key] = [];
-        savedProcesses[key] = false;
-      });
+  function clearProcessStates(): void {
+    DAILY5S_KEYS.forEach((key) => {
+      processState[key] = { rating: null, grade1Reason: [], grade1Comment: '' };
+      processFiles[key] = [];
+      savedProcesses[key] = false;
+    });
+  }
+
+  function resetCurrentAudit(): void {
+    auditId.value = null;
+    error.value = null;
+    selectedProcessKeys.value = [];
+    clearProcessStates();
+  }
+
+  function setTurma(value: 'A e C' | 'B e D' | null): void {
+    turma.value = value;
+  }
+
+  function setAuditDate(value: string): void {
+    if (!value || value === selectedAuditDate.value) {
+      return;
     }
 
-    function clearActiveDraftState(preserveTurma = true): void {
-      auditId.value = null;
-      error.value = null;
-      selectedProcessKeys.value = [];
+    selectedAuditDate.value = value;
+  }
 
-      if (!preserveTurma) {
-        turma.value = null;
-      }
+  const DAILY5S_KEY_SET = new Set(DAILY5S_KEYS);
 
-      clearProcessStates();
+  function setSelectedProcesses(processKeys: Daily5sAuditProcessKey[]): void {
+    const unique = [...new Set(processKeys)].filter((key) => DAILY5S_KEY_SET.has(key));
+    selectedProcessKeys.value = unique;
+  }
+
+  function initialize(): void {
+    const auditorId = authStore.firebaseUser?.uid;
+
+    if (!auditorId) {
+      throw new Error('Cannot initialize daily 5S audit: no authenticated user.');
     }
 
-    function discardStaleDraftIfNeeded(): void {
-      const activeDate = selectedAuditDate.value;
-      const auditorId = authStore.firebaseUser?.uid ?? null;
+    selectedProcessKeys.value = [];
+    clearProcessStates();
+  }
 
-      const isDifferentAuditor = Boolean(
-        draftAuditorId.value && draftAuditorId.value !== auditorId,
-      );
-      const isDifferentDay = Boolean(draftDate.value && draftDate.value !== activeDate);
-      const hasStaleAuditId = Boolean(auditId.value && auditId.value !== activeDate);
+  async function ensureAuditStarted(): Promise<void> {
+    const auditorId = authStore.firebaseUser?.uid;
 
-      if (!isDifferentAuditor && !isDifferentDay && !hasStaleAuditId) {
-        return;
-      }
-
-      clearActiveDraftState(!isDifferentAuditor);
-      dayRolloverNotice.value = isDifferentDay || hasStaleAuditId;
-
-      draftDate.value = null;
-      draftAuditorId.value = auditorId;
-      draftCompleted.value = false;
-      draftCompletedAuditId.value = null;
+    if (!auditorId) {
+      throw new Error('Cannot start daily 5S audit: no authenticated user.');
     }
 
-    function setTurma(value: 'A e C' | 'B e D' | null): void {
-      turma.value = value;
+    if (!turma.value) {
+      throw new Error('Selecione a turma antes de iniciar a auditoria Daily 5S.');
     }
 
-    function setAuditDate(value: string): void {
-      if (!value || value === selectedAuditDate.value) {
-        return;
-      }
-
-      selectedAuditDate.value = value;
-      clearActiveDraftState();
-      draftDate.value = null;
-      draftCompleted.value = false;
-      draftCompletedAuditId.value = null;
-      dayRolloverNotice.value = false;
+    if (auditId.value) {
+      return;
     }
 
-    const DAILY5S_KEY_SET = new Set(DAILY5S_KEYS);
+    const createdAuditId = await daily5sAuditService.ensureAudit(
+      selectedAuditDate.value,
+      turma.value,
+      auditorId,
+    );
 
-    function setSelectedProcesses(processKeys: Daily5sAuditProcessKey[]): void {
-      const unique = [...new Set(processKeys)].filter((key) => DAILY5S_KEY_SET.has(key));
-      selectedProcessKeys.value = unique;
+    auditId.value = createdAuditId;
+  }
+
+  async function persistProcess(processKey: Daily5sAuditProcessKey): Promise<void> {
+    const auditorId = authStore.firebaseUser?.uid;
+
+    if (!auditorId) {
+      throw new Error('Cannot save daily 5S process: no authenticated user.');
     }
 
-    function consumeDayRolloverNotice(): boolean {
-      const shouldShow = dayRolloverNotice.value;
-      dayRolloverNotice.value = false;
-      return shouldShow;
+    if (!selectedProcessKeys.value.includes(processKey)) {
+      throw new Error('Selecione o processo antes de salvar a avaliacao.');
     }
 
-    async function hydrateSavedProcesses(existingAuditId: string): Promise<void> {
-      const persisted = await getDaily5sResultsForAudit(existingAuditId);
-
-      clearProcessStates();
-
-      persisted.forEach((result) => {
-        processState[result.process] = {
-          rating: result.rating,
-          grade1Reason: result.grade1Reason,
-          grade1Comment: result.grade1Comment,
-        };
-        processFiles[result.process] = [];
-        savedProcesses[result.process] = true;
-      });
-
-      // Do not restore selectedProcessKeys — the page always starts fresh.
-      // Already-rated processes are visible in the Daily5sRatedProcessesCard.
+    const { rating, grade1Reason, grade1Comment } = processState[processKey];
+    if (rating === null) {
+      throw new Error('Selecione uma nota (1, 3 ou 5) para salvar o processo.');
     }
 
-    async function initialize(): Promise<void> {
-      const auditorId = authStore.firebaseUser?.uid;
+    const normalizedReasons = grade1Reason
+      .map((reason) => reason.trim())
+      .filter((reason): reason is string => reason.length > 0);
+    const trimmedGrade1Comment = grade1Comment.trim();
+    const files = processFiles[processKey];
 
-      if (!auditorId) {
-        return;
+    if (rating === 1) {
+      if (!normalizedReasons.length) {
+        throw new Error('Motivo obrigatorio para nota 1.');
       }
 
-      // The audit page should always start with no visible process cards.
-      // Users choose processes each time they open the page.
-      selectedProcessKeys.value = [];
-      clearProcessStates();
-
-      discardStaleDraftIfNeeded();
-
-      // Keep local draft if it already belongs to today and this user.
-      if (
-        auditId.value &&
-        draftDate.value === selectedAuditDate.value &&
-        draftAuditorId.value === auditorId &&
-        !draftCompleted.value
-      ) {
-        return;
+      if (!normalizedReasons.every((reason) => isDaily5sIssueReason(reason))) {
+        throw new Error('Motivo invalido para nota 1.');
       }
 
-      const todaysStatus = await getDaily5sStatusByDate(auditorId, selectedAuditDate.value);
-      if (!todaysStatus) {
-        return;
+      if (!files.length) {
+        throw new Error('Imagem obrigatoria para nota 1.');
       }
-
-      draftDate.value = selectedAuditDate.value;
-      draftAuditorId.value = auditorId;
-      draftCompleted.value = todaysStatus.completed;
-      draftCompletedAuditId.value = todaysStatus.completed ? todaysStatus.auditId : null;
-
-      if (todaysStatus.turma) {
-        turma.value = todaysStatus.turma;
-      }
-
-      if (todaysStatus.completed) {
-        clearActiveDraftState();
-        draftCompleted.value = false;
-        draftCompletedAuditId.value = null;
-        return;
-      }
-
-      auditId.value = todaysStatus.auditId;
-      await hydrateSavedProcesses(todaysStatus.auditId);
     }
 
-    async function ensureAuditStarted(): Promise<void> {
-      const auditorId = authStore.firebaseUser?.uid;
+    await ensureAuditStarted();
 
-      if (!auditorId) {
-        throw new Error('Cannot start daily 5S audit: no authenticated user.');
-      }
+    await daily5sAuditService.updateProcess(
+      auditId.value as string,
+      selectedAuditDate.value,
+      turma.value as 'A e C' | 'B e D',
+      processKey,
+      toStatus(rating),
+      null,
+      rating === 1 ? files : null,
+      {
+        rating,
+        grade1Reason:
+          rating === 1 ? normalizedReasons.filter((reason) => isDaily5sIssueReason(reason)) : null,
+        grade1Comment: rating === 1 ? trimmedGrade1Comment || null : null,
+        inspectorId: auditorId,
+      },
+    );
 
-      if (!turma.value) {
-        throw new Error('Selecione a turma antes de iniciar a auditoria Daily 5S.');
-      }
+    processFiles[processKey] = [];
+    savedProcesses[processKey] = true;
+  }
 
-      if (auditId.value) {
-        return;
-      }
+  async function saveProcess(processKey: Daily5sAuditProcessKey): Promise<void> {
+    loading.value = true;
+    error.value = null;
 
-      const createdAuditId = await daily5sAuditService.createAudit(
-        selectedAuditDate.value,
-        selectedAuditDate.value,
-        turma.value,
-        auditorId,
-      );
+    try {
+      await persistProcess(processKey);
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : String(err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
 
-      auditId.value = createdAuditId;
-      draftDate.value = selectedAuditDate.value;
-      draftAuditorId.value = auditorId;
-      draftCompleted.value = false;
-      draftCompletedAuditId.value = null;
+  async function finishAudit(): Promise<void> {
+    if (!selectedProcessKeys.value.length) {
+      throw new Error('Selecione ao menos um processo para finalizar a auditoria Daily 5S.');
     }
 
-    async function persistProcess(processKey: Daily5sAuditProcessKey): Promise<void> {
-      const auditorId = authStore.firebaseUser?.uid;
+    if (!allSelectedValid.value) {
+      throw new Error('Complete as avaliacoes dos processos selecionados antes de finalizar.');
+    }
 
-      if (!auditorId) {
-        throw new Error('Cannot save daily 5S process: no authenticated user.');
-      }
+    loading.value = true;
+    error.value = null;
 
-      if (!selectedProcessKeys.value.includes(processKey)) {
-        throw new Error('Selecione o processo antes de salvar a avaliacao.');
-      }
-
-      const { rating, grade1Reason, grade1Comment } = processState[processKey];
-      if (rating === null) {
-        throw new Error('Selecione uma nota (1, 3 ou 5) para salvar o processo.');
-      }
-
-      const normalizedReasons = grade1Reason
-        .map((reason) => reason.trim())
-        .filter((reason): reason is string => reason.length > 0);
-      const trimmedGrade1Comment = grade1Comment.trim();
-      const files = processFiles[processKey];
-
-      if (rating === 1) {
-        if (!normalizedReasons.length) {
-          throw new Error('Motivo obrigatorio para nota 1.');
-        }
-
-        if (!normalizedReasons.every((reason) => isDaily5sIssueReason(reason))) {
-          throw new Error('Motivo invalido para nota 1.');
-        }
-
-        if (!files.length) {
-          throw new Error('Imagem obrigatoria para nota 1.');
-        }
-      }
-
+    try {
       await ensureAuditStarted();
 
-      await daily5sAuditService.updateProcess(
-        auditId.value as string,
-        selectedAuditDate.value,
-        turma.value as 'A e C' | 'B e D',
-        processKey,
-        toStatus(rating),
-        null,
-        rating === 1 ? files : null,
-        {
-          rating,
-          grade1Reason:
-            rating === 1
-              ? normalizedReasons.filter((reason) => isDaily5sIssueReason(reason))
-              : null,
-          grade1Comment: rating === 1 ? trimmedGrade1Comment || null : null,
-          inspectorId: auditorId,
-        },
-      );
-
-      processFiles[processKey] = [];
-      savedProcesses[processKey] = true;
-    }
-
-    async function saveProcess(processKey: Daily5sAuditProcessKey): Promise<void> {
-      loading.value = true;
-      error.value = null;
-
-      try {
+      for (const processKey of selectedProcessKeys.value) {
         await persistProcess(processKey);
-      } catch (err: unknown) {
-        error.value = err instanceof Error ? err.message : String(err);
-        throw err;
-      } finally {
-        loading.value = false;
       }
+
+      await daily5sAuditService.completeAudit(auditId.value as string);
+
+      resetCurrentAudit();
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : String(err);
+      throw err;
+    } finally {
+      loading.value = false;
     }
+  }
 
-    async function finishAudit(): Promise<void> {
-      if (!selectedProcessKeys.value.length) {
-        throw new Error('Selecione ao menos um processo para finalizar a auditoria Daily 5S.');
-      }
-
-      if (!allSelectedValid.value) {
-        throw new Error('Complete as avaliacoes dos processos selecionados antes de finalizar.');
-      }
-
-      loading.value = true;
-      error.value = null;
-
-      try {
-        await ensureAuditStarted();
-
-        for (const processKey of selectedProcessKeys.value) {
-          await persistProcess(processKey);
-        }
-
-        await daily5sAuditService.completeAudit(auditId.value as string);
-
-        draftCompletedAuditId.value = auditId.value;
-        draftCompleted.value = false;
-        clearActiveDraftState();
-      } catch (err: unknown) {
-        error.value = err instanceof Error ? err.message : String(err);
-        throw err;
-      } finally {
-        loading.value = false;
-      }
-    }
-
-    function checkTodaysDraft(): {
-      auditId: string;
-      selectedProcesses: Daily5sAuditProcessKey[];
-      ratedCount: number;
-      completed: boolean;
-    } | null {
-      discardStaleDraftIfNeeded();
-
-      const auditorId = authStore.firebaseUser?.uid;
-
-      if (!auditorId || draftAuditorId.value !== auditorId || draftDate.value !== getTodayKey()) {
-        return null;
-      }
-
-      if (draftCompleted.value) {
-        if (!draftCompletedAuditId.value) {
-          return null;
-        }
-
-        return {
-          auditId: draftCompletedAuditId.value,
-          selectedProcesses: selectedProcessKeys.value,
-          ratedCount: selectedProcessKeys.value.length,
-          completed: true,
-        };
-      }
-
-      if (!auditId.value) {
-        return null;
-      }
-
-      return {
-        auditId: auditId.value,
-        selectedProcesses: selectedProcessKeys.value,
-        ratedCount: ratedCount.value,
-        completed: false,
-      };
-    }
-
-    return {
-      auditId,
-      turma,
-      selectedAuditDate,
-      selectedProcessKeys,
-      processState,
-      processFiles,
-      savedProcesses,
-      loading,
-      error,
-      selectedCount,
-      ratedCount,
-      allSelectedValid,
-      setTurma,
-      setAuditDate,
-      setSelectedProcesses,
-      initialize,
-      saveProcess,
-      finishAudit,
-      checkTodaysDraft,
-      consumeDayRolloverNotice,
-    };
-  },
-  {
-    persist: {
-      key: 'daily-5s-audit-form-draft-v5',
-      pick: [
-        'auditId',
-        'turma',
-        'selectedAuditDate',
-        'draftDate',
-        'draftAuditorId',
-        'draftCompleted',
-        'draftCompletedAuditId',
-      ],
-    },
-  },
-);
+  return {
+    auditId,
+    turma,
+    selectedAuditDate,
+    selectedProcessKeys,
+    processState,
+    processFiles,
+    savedProcesses,
+    loading,
+    error,
+    selectedCount,
+    ratedCount,
+    allSelectedValid,
+    setTurma,
+    setAuditDate,
+    setSelectedProcesses,
+    initialize,
+    saveProcess,
+    finishAudit,
+  };
+});

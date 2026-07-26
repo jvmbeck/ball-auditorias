@@ -4,7 +4,7 @@
       <div>
         <div class="process-title-row">
           <div class="process-label">{{ label }}</div>
-          <q-btn dense round flat size="sm" icon="info" color="primary" @click="isInfoOpen = true">
+          <q-btn dense round flat size="md" icon="info" color="primary" @click="isInfoOpen = true">
             <q-tooltip anchor="top middle" self="bottom middle">Como pontuar esta area</q-tooltip>
           </q-btn>
           <q-icon
@@ -184,7 +184,7 @@ const statusChip = computed(() => {
     return { label: 'Nota 5', color: 'positive' };
   }
 
-  return { label: 'Nao Avaliado', color: 'grey-6' };
+  return { label: 'Não Avaliado', color: 'grey-6' };
 });
 
 const isValid = computed(() => {

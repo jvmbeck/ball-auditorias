@@ -198,6 +198,38 @@ export function createAuditService(config: AuditServiceConfig) {
    * @param inspector User ID of the inspector
    * @returns Document ID
    */
+  async function ensureAudit(
+    date: string,
+    turma: 'A e C' | 'B e D',
+    inspector: string,
+  ): Promise<string> {
+    if (config.auditCollection !== 'daily5sAudits') {
+      throw new Error(
+        `ensureAudit is only supported for the '${config.auditCollection}' collection.`,
+      );
+    }
+
+    const auditRef = doc(db, config.auditCollection, date);
+    const snapshot = await getDoc(auditRef);
+
+    if (!snapshot.exists()) {
+      const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & {
+        createdAt: FieldValue;
+      } = {
+        date,
+        turma,
+        inspector,
+        aggregateGrades: {},
+        completedProcesses: 0,
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(auditRef, daily5sPayload);
+    }
+
+    return date;
+  }
+
   async function createAudit(
     auditId: string,
     date: string,
@@ -207,35 +239,20 @@ export function createAuditService(config: AuditServiceConfig) {
     if (config.auditCollection === 'daily5sAudits') {
       const auditRef = doc(db, config.auditCollection, date);
       const snapshot = await getDoc(auditRef);
-
       if (!snapshot.exists()) {
-        const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & {
-          createdAt: FieldValue;
-        } = {
-          date,
-          turma,
-          inspector,
-          aggregateGrades: {},
-          completedProcesses: 0,
-          createdAt: serverTimestamp(),
-        };
-
+        const daily5sPayload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } =
+          {
+            date,
+            turma,
+            inspector,
+            aggregateGrades: {},
+            completedProcesses: 0,
+            createdAt: serverTimestamp(),
+          };
         await setDoc(auditRef, daily5sPayload);
       }
-
       return date;
     }
-
-    const payload: Omit<DualTypeAuditDocument, 'createdAt'> & { createdAt: FieldValue } = {
-      date,
-      turma,
-      inspector,
-      createdAt: serverTimestamp(),
-    };
-
-    const auditRef = doc(db, config.auditCollection, auditId);
-    await setDoc(auditRef, payload, { merge: true });
-
     return auditId;
   }
 
@@ -514,6 +531,7 @@ export function createAuditService(config: AuditServiceConfig) {
 
   // Public API
   return {
+    ensureAudit,
     createAudit,
     updateProcess,
     completeAudit,

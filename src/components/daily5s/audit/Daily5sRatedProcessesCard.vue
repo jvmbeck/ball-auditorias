@@ -67,10 +67,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
-import {
-  getDaily5sRatedProcessKeysByDate,
-  subscribeDaily5sRatedProcessKeysByDate,
-} from 'src/services/audit';
+import { subscribeDaily5sRatedProcessKeysByDate } from 'src/services/audit';
 import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit/daily5sDefinitions';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import type { QTableProps } from 'quasar';
@@ -87,11 +84,9 @@ interface ProcessRow {
 
 const props = withDefaults(
   defineProps<{
-    refreshToken?: number;
     auditDate?: string;
   }>(),
   {
-    refreshToken: 0,
     auditDate: '',
   },
 );
@@ -169,43 +164,41 @@ const rows = computed<ProcessRow[]>(() =>
   }),
 );
 
-async function loadRatedProcesses(): Promise<void> {
+function startRatedProcessesListener(): void {
   if (!inspectorId.value) {
     ratedProcessKeys.value = [];
+    loading.value = false;
+
     if (unsubscribeRealtime.value) {
       unsubscribeRealtime.value();
       unsubscribeRealtime.value = null;
     }
+
     return;
   }
 
   loading.value = true;
 
-  try {
-    const date = props.auditDate || new Date().toISOString().slice(0, 10);
-    ratedProcessKeys.value = await getDaily5sRatedProcessKeysByDate(date);
-
-    if (unsubscribeRealtime.value) {
-      unsubscribeRealtime.value();
-      unsubscribeRealtime.value = null;
-    }
-
-    unsubscribeRealtime.value = subscribeDaily5sRatedProcessKeysByDate(
-      date,
-      (keys) => {
-        ratedProcessKeys.value = keys;
-      },
-      () => {
-        loading.value = false;
-      },
-    );
-  } finally {
-    loading.value = false;
+  if (unsubscribeRealtime.value) {
+    unsubscribeRealtime.value();
   }
+
+  const date = props.auditDate || new Date().toISOString().slice(0, 10);
+
+  unsubscribeRealtime.value = subscribeDaily5sRatedProcessKeysByDate(
+    date,
+    (keys) => {
+      ratedProcessKeys.value = keys;
+      loading.value = false;
+    },
+    () => {
+      loading.value = false;
+    },
+  );
 }
 
 onMounted(() => {
-  void loadRatedProcesses();
+  startRatedProcessesListener();
 });
 
 onBeforeUnmount(() => {
@@ -218,21 +211,14 @@ onBeforeUnmount(() => {
 watch(
   () => inspectorId.value,
   () => {
-    void loadRatedProcesses();
-  },
-);
-
-watch(
-  () => props.refreshToken,
-  () => {
-    void loadRatedProcesses();
+    startRatedProcessesListener();
   },
 );
 
 watch(
   () => props.auditDate,
   () => {
-    void loadRatedProcesses();
+    startRatedProcessesListener();
   },
 );
 </script>

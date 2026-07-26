@@ -1,5 +1,5 @@
 <template>
-  <q-page class="index-page q-pa-md">
+  <q-page class="index-page">
     <div class="index-shell">
       <!-- Hero section -->
       <section class="hero">
@@ -33,7 +33,7 @@ import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRated
 .index-shell {
   max-width: 1320px;
   margin: 0 auto;
-  padding-top: min(5vh, 84px);
+  padding-top: min(2vh, 40px);
   display: flex;
   gap: 1rem;
   flex-direction: column;
@@ -41,6 +41,7 @@ import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRated
 
 .daily5s-grid {
   display: flex;
+  flex-direction: column;
   gap: 2rem;
 }
 

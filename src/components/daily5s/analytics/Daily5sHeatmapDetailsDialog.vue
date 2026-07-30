@@ -23,7 +23,7 @@
 
       <q-card-section v-if="loading" class="state-box">
         <q-spinner color="primary" size="30px" />
-        <span>Carregando detalhes da avaliacao...</span>
+        <span>Carregando detalhes da avaliação...</span>
       </q-card-section>
 
       <q-card-section v-else-if="error" class="state-box">
@@ -34,13 +34,13 @@
       <q-card-section v-else>
         <div class="section-block q-mb-md">
           <div class="section-title">Motivo</div>
-          <div class="section-content">{{ details?.reason || 'Nao informado' }}</div>
+          <div class="section-content">{{ details?.reason || 'Não informado' }}</div>
         </div>
 
         <div class="section-block q-mb-md">
-          <div class="section-title">Comentario do auditor</div>
+          <div class="section-title">Comentário do auditor</div>
           <div class="section-content">
-            {{ details?.auditorComment || 'Sem comentario do auditor' }}
+            {{ details?.auditorComment || 'Sem comentário do auditor' }}
           </div>
         </div>
 
@@ -73,7 +73,7 @@
   <q-dialog v-model="isImageViewerOpen" maximized>
     <q-card class="image-viewer-card bg-black text-white">
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-subtitle1">Imagens da avaliacao</div>
+        <div class="text-subtitle1">Imagens da avaliação</div>
         <q-space />
         <q-btn icon="close" flat round dense color="white" @click="isImageViewerOpen = false" />
       </q-card-section>
@@ -105,12 +105,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Daily5sHeatmapValue, Daily5sTurma } from 'src/types/audit';
+import type { Daily5sHeatmapValue, AuditTurma } from 'src/types/audit';
 
 interface HeatmapDetailPayload {
   date: string;
   dateLabel: string;
-  turma: Daily5sTurma;
+  turma: AuditTurma;
   processKey: string;
   processLabel: string;
   rating: Daily5sHeatmapValue;

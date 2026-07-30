@@ -52,17 +52,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
+import { computed, onMounted, provide, ref, watch } from 'vue';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { use } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, MarkLineComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import {
-  getTodaysDaily5sRatedProcessKeys,
-  subscribeTodaysDaily5sRatedProcessKeys,
-} from 'src/services/audit';
-import { DAILY5S_MAX_SCORE } from 'src/services/audit/analytics.daily5sCanonical';
+import { DAILY5S_MAX_SCORE } from 'src/services/daily5s/analytics.daily5sCanonical';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, MarkLineComponent]);
@@ -81,7 +77,6 @@ const props = withDefaults(
 const analyticsStore = useAnalyticsStore();
 const loading = computed(() => analyticsStore.daily5sAnalyticsLoading);
 const error = computed(() => analyticsStore.daily5sAnalyticsError);
-const unsubscribeRealtime = ref<(() => void) | null>(null);
 const selectedTurmaView = ref<'combined' | 'ac' | 'bd'>('combined');
 
 const turmaLegendPills: Array<{
@@ -416,46 +411,13 @@ const chartOption = computed(() => ({
   ],
 }));
 
-async function loadScoreTrend(): Promise<void> {
+async function loadScoreTrend(forceRefresh = false): Promise<void> {
   if (!props.monthKey) {
     return;
   }
 
   try {
-    await analyticsStore.loadDaily5sAnalytics(props.monthKey, false);
-  } catch {
-    // Shared error state is managed by the analytics store.
-  }
-}
-
-async function refreshScoreTrend(): Promise<void> {
-  if (!props.monthKey) {
-    return;
-  }
-
-  try {
-    await analyticsStore.loadDaily5sAnalytics(props.monthKey, true);
-  } catch {
-    // Shared error state is managed by the analytics store.
-  }
-}
-
-async function subscribeRealtimeRefresh(): Promise<void> {
-  if (unsubscribeRealtime.value) {
-    unsubscribeRealtime.value();
-    unsubscribeRealtime.value = null;
-  }
-
-  try {
-    await getTodaysDaily5sRatedProcessKeys();
-    unsubscribeRealtime.value = subscribeTodaysDaily5sRatedProcessKeys(
-      () => {
-        void refreshScoreTrend();
-      },
-      () => {
-        // Shared error state is managed by the analytics store.
-      },
-    );
+    await analyticsStore.loadDaily5sAnalytics(props.monthKey, forceRefresh);
   } catch {
     // Shared error state is managed by the analytics store.
   }
@@ -463,14 +425,6 @@ async function subscribeRealtimeRefresh(): Promise<void> {
 
 onMounted(() => {
   void loadScoreTrend();
-  void subscribeRealtimeRefresh();
-});
-
-onBeforeUnmount(() => {
-  if (unsubscribeRealtime.value) {
-    unsubscribeRealtime.value();
-    unsubscribeRealtime.value = null;
-  }
 });
 
 watch(
@@ -483,7 +437,7 @@ watch(
 watch(
   () => props.refreshToken,
   () => {
-    void refreshScoreTrend();
+    void loadScoreTrend(true);
   },
 );
 </script>

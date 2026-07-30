@@ -114,7 +114,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import {
   DAILY5S_PROCESS_DEFINITIONS,
   DAILY5S_PROCESS_SECTION_LABELS,
-} from 'src/services/audit/daily5sDefinitions';
+} from 'src/services/daily5s/daily5sDefinitions';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
 

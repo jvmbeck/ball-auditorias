@@ -116,10 +116,10 @@ import {
   DAILY5S_BACKEND_PROCESS_DEFINITIONS,
   DAILY5S_FRONTEND_PROCESS_DEFINITIONS,
   DAILY5S_PROCESS_DEFINITIONS,
-} from 'src/services/audit/daily5sDefinitions';
-import { getTurmaForDate } from 'src/services/audit/analytics.daily5sCanonical';
+} from 'src/services/daily5s/daily5sDefinitions';
+import { getTurmaForDate } from 'src/services/daily5s/analytics.daily5sCanonical';
 import { useDaily5sAuditStore } from 'src/stores/daily5sAudit.store';
-import type { Daily5sAuditProcessKey } from 'src/types/audit';
+import type { Daily5sAuditProcessKey, AuditTurma } from 'src/types/audit';
 
 const $q = useQuasar();
 const router = useRouter();
@@ -139,7 +139,7 @@ const {
 const pageError = ref<string | null>(null);
 const todayDate = new Date().toISOString().slice(0, 10);
 
-const selectedTurma = computed<'A e C' | 'B e D' | null>({
+const selectedTurma = computed<AuditTurma>({
   get: () => turma.value,
   set: (value) => daily5sStore.setTurma(value),
 });

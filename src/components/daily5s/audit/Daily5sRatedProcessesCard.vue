@@ -67,8 +67,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
-import { subscribeDaily5sRatedProcessKeysByDate } from 'src/services/audit';
-import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/audit/daily5sDefinitions';
+import { subscribeDaily5sRatedProcessKeysByDate } from 'src/services/daily5s';
+import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/daily5s/daily5sDefinitions';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import type { QTableProps } from 'quasar';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';

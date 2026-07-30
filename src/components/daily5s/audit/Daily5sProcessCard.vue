@@ -110,7 +110,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { DAILY5S_ISSUE_REASONS } from 'src/services/audit/daily5sDefinitions';
+import { DAILY5S_ISSUE_REASONS } from 'src/services/daily5s/daily5sDefinitions.js';
 import type { Daily5sRatingValue } from 'src/types/audit';
 import Daily5sInfoDialog from './Daily5sInfoDialog.vue';
 

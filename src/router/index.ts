@@ -75,33 +75,27 @@ export default defineRouter(function (/* { store, ssrContext } */) {
     }
 
     if (authStore.isAuthenticated) {
-      // Redirect away from root to a role landing page.
+      // Make sure profile exists before routing by role
+      if (!authStore.role) {
+        await authStore.syncAuthState(authStore.firebaseUser);
+      }
+
+      if (!authStore.role) {
+        return '/login';
+      }
+
+      const landingPage = authStore.role === 'admin' ? '/admin' : '/auditor';
+
       if (to.path === '/') {
-        return authStore.role === 'admin' ? '/admin' : '/auditor';
+        return landingPage;
       }
 
-      // Block authenticated users from guest-only pages.
       if (guestOnly) {
-        return authStore.role === 'admin' ? '/admin' : '/auditor';
+        return landingPage;
       }
 
-      // Enforce role-specific visibility when route declares allowed roles.
-      if (allowedRoles.length > 0) {
-        let userRole = authStore.role;
-
-        if (!userRole) {
-          // Recover from auth/profile timing races after sign-in.
-          await authStore.syncAuthState(authStore.firebaseUser);
-          userRole = authStore.role;
-
-          if (!userRole) {
-            return '/login';
-          }
-        }
-
-        if (!allowedRoles.includes(userRole)) {
-          return userRole === 'admin' ? '/admin' : '/auditor';
-        }
+      if (allowedRoles.length > 0 && !allowedRoles.includes(authStore.role)) {
+        return landingPage;
       }
     }
   });

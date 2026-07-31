@@ -1,7 +1,7 @@
 {
   "name": "ball-auditorias",
   "version": "0.0.1",
-  "description": "Sistema de auditorias para processos industriais, com foco em checklists 5s e RTO (Relatório de Turno Operacional).",
+  "description": "Sistema de auditorias para processos industriais, com foco em auditorias de 5S.",
   "productName": "Ball Auditorias",
   "author": "jvmbeck <jmadridbeck@gmail.com>",
   "type": "module",

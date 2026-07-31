@@ -66,13 +66,13 @@ import {
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import Daily5sHeatmapDetailsDialog from 'src/components/daily5s/analytics/Daily5sHeatmapDetailsDialog.vue';
-import { getLatestDaily5sProcessResultByDate } from 'src/services/audit/auditProcessResults';
-import type { Daily5sHeatmapValue, Daily5sTurma } from 'src/types/audit';
+import { getProcessResultByDate } from 'src/services/daily5s/auditProcessResults';
+import type { Daily5sHeatmapValue, AuditTurma } from 'src/types/audit';
 
 interface HeatmapDetailPayload {
   date: string;
   dateLabel: string;
-  turma: Daily5sTurma;
+  turma: AuditTurma;
   processKey: string;
   processLabel: string;
   rating: Daily5sHeatmapValue;
@@ -223,8 +223,8 @@ async function handleHeatmapClick(params: unknown): Promise<void> {
   detailsError.value = null;
 
   try {
-    const result = await getLatestDaily5sProcessResultByDate(category.date, processKey);
-    const reason = formatGrade1Reason(result?.grade1Reason, result?.comment);
+    const result = await getProcessResultByDate(category.date, processKey);
+    const reason = formatGrade1Reason(result?.grade1Reason, result?.grade1Comment);
     const auditorComment = result?.grade1Comment?.trim() || null;
 
     selectedDetails.value = {
@@ -240,7 +240,7 @@ async function handleHeatmapClick(params: unknown): Promise<void> {
     };
   } catch (err: unknown) {
     detailsError.value =
-      err instanceof Error ? err.message : 'Nao foi possivel carregar os detalhes da avaliacao.';
+      err instanceof Error ? err.message : 'Não foi possivel carregar os detalhes da avaliacao.';
   } finally {
     detailsLoading.value = false;
   }

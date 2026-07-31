@@ -1,5 +1,5 @@
 import { db } from 'boot/firebase';
-import { collection, doc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import {
   DAILY5S_ISSUE_REASONS,
@@ -7,10 +7,9 @@ import {
   DAILY5S_PROCESS_LABELS,
   isDaily5sIssueReason,
   isDaily5sProcessKey,
-} from 'src/services/audit/daily5sDefinitions';
+} from 'src/services/daily5s/daily5sDefinitions';
 import type {
   Daily5sActionPlanData,
-  Daily5sActionPlanOwner,
   Daily5sActionPlanRow,
   Daily5sAuditProcessKey,
   Daily5sCanonicalMonthlyData,
@@ -29,11 +28,11 @@ import type {
   Daily5sRatingValue,
   Daily5sRating1ByProcessData,
   Daily5sScoreTrendData,
-  Daily5sTurma,
-  DualTypeAuditDocument,
-  DualTypeAuditResultDocument,
+  AuditTurma,
 } from 'src/types/audit';
+import { ACTION_OWNER_BY_REASON } from 'src/types/actionPlans';
 import { toDateKey } from 'src/utils/dateFormatting';
+import type { Daily5sAuditDocument } from 'src/types/daily5sDocuments';
 
 const ISSUE_REASON_COLORS: Record<Daily5sIssueReason, string> = {
   'Latas acumuladas': '#d64545',
@@ -42,14 +41,7 @@ const ISSUE_REASON_COLORS: Record<Daily5sIssueReason, string> = {
   Desorganização: '#2e9f5f',
 };
 
-const ACTION_OWNER_BY_REASON: Record<Daily5sIssueReason, Daily5sActionPlanOwner> = {
-  'Latas acumuladas': 'Turma ou Cormat',
-  'Sujeira no Piso': 'Sodexo',
-  'Sujeira nas Máquinas': 'Turma ou Cormat',
-  Desorganização: 'Turma',
-};
-
-const TURMA_ORDER: Daily5sTurma[] = ['A e C', 'B e D'];
+const TURMA_ORDER: AuditTurma[] = ['A e C', 'B e D'];
 
 // Reference date: the first day of an A e C 4-day block.
 // The cycle repeats every 8 days (4 days A e C, then 4 days B e D).
@@ -78,25 +70,12 @@ function toDisplayDate(dateKey: string): string {
   return `${day}/${month}`;
 }
 
-function toTurmaTag(turma: Daily5sTurma): string {
+function toTurmaTag(turma: AuditTurma): string {
   return turma === 'A e C' ? 'A/C' : 'B/D';
 }
 
 function isDateKey(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function getTimestampMs(value: unknown): number {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    'toMillis' in value &&
-    typeof value.toMillis === 'function'
-  ) {
-    return (value as { toMillis: () => number }).toMillis();
-  }
-
-  return 0;
 }
 
 function normalizeRating(rating: unknown, status: unknown): Daily5sHeatmapValue {
@@ -117,7 +96,6 @@ function normalizeRating(rating: unknown, status: unknown): Daily5sHeatmapValue 
 
 function normalizeReasons(grade1Reason: unknown, legacyComment: unknown): Daily5sIssueReason[] {
   const normalized = new Set<Daily5sIssueReason>();
-
   if (Array.isArray(grade1Reason)) {
     grade1Reason.forEach((value) => {
       if (isDaily5sIssueReason(value)) {
@@ -155,58 +133,6 @@ function normalizeAggregateGrades(
   });
 
   return normalized;
-}
-
-async function migrateLegacyAuditAggregate(
-  auditId: string,
-): Promise<Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>> {
-  const resultsQuery = query(
-    collection(db, 'daily5sProcessResults'),
-    where('auditId', '==', auditId),
-  );
-  const resultSnapshots = await getDocs(resultsQuery);
-
-  const latestByProcess = new Map<
-    Daily5sAuditProcessKey,
-    { rating: Daily5sRatingValue; createdAtMs: number }
-  >();
-
-  resultSnapshots.forEach((snapshot) => {
-    const data = snapshot.data() as Partial<DualTypeAuditResultDocument>;
-
-    if (typeof data.process !== 'string' || !isDaily5sProcessKey(data.process)) {
-      return;
-    }
-
-    const rating = normalizeRating(data.rating, data.status);
-    if (rating !== 1 && rating !== 3 && rating !== 5) {
-      return;
-    }
-
-    const createdAtMs = getTimestampMs(data.createdAt);
-    const current = latestByProcess.get(data.process);
-
-    if (!current || createdAtMs >= current.createdAtMs) {
-      latestByProcess.set(data.process, { rating, createdAtMs });
-    }
-  });
-
-  const aggregateGrades: Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>> = {};
-  latestByProcess.forEach((value, processKey) => {
-    aggregateGrades[processKey] = value.rating;
-  });
-
-  // TODO: Remove this migration once all legacy daily5sAudits docs have aggregateGrades backfilled.
-  await setDoc(
-    doc(db, 'daily5sAudits', auditId),
-    {
-      aggregateGrades,
-      completedProcesses: Object.keys(aggregateGrades).length,
-    },
-    { merge: true },
-  );
-
-  return aggregateGrades;
 }
 
 function sortBuckets(
@@ -261,7 +187,7 @@ function buildMonthDateKeys(monthKey: string): string[] {
   });
 }
 
-export function getTurmaForDate(dateKey: string): Daily5sTurma {
+export function getTurmaForDate(dateKey: string): AuditTurma {
   const epochMs = new Date(`${TURMA_EPOCH}T00:00:00`).getTime();
   const dateMs = new Date(`${dateKey}T00:00:00`).getTime();
   const daysSinceEpoch = Math.round((dateMs - epochMs) / 86_400_000);
@@ -359,21 +285,14 @@ export async function fetchDaily5sCanonicalMonthlyData(
       return;
     }
 
-    const normalizedStatus =
-      data.status === 'updated' || data.status === 'not_updated' ? data.status : null;
-
     const reasons = normalizeReasons(data.grade1Reason, data.comment);
 
     rows.push({
-      id: snapshot.id,
       date,
       turma,
       process,
       rating: normalizeRating(data.rating, data.status),
-      status: normalizedStatus,
-      hasIssue: normalizedStatus === 'not_updated',
-      comments: reasons,
-      createdAtMs: getTimestampMs(data.createdAt),
+      grade1Reason: reasons,
     });
   });
 
@@ -400,7 +319,7 @@ export async function fetchDaily5sAggregatedMonthlyData(
   const rows: Daily5sCanonicalRow[] = [];
 
   for (const snapshot of auditSnapshots.docs) {
-    const data = snapshot.data() as Partial<DualTypeAuditDocument>;
+    const data = snapshot.data() as Partial<Daily5sAuditDocument>;
     const date = typeof data.date === 'string' ? data.date : null;
     const turma = data.turma === 'A e C' || data.turma === 'B e D' ? data.turma : null;
 
@@ -408,12 +327,7 @@ export async function fetchDaily5sAggregatedMonthlyData(
       continue;
     }
 
-    let aggregateGrades = normalizeAggregateGrades(data.aggregateGrades);
-    if (data.aggregateGrades == null) {
-      aggregateGrades = await migrateLegacyAuditAggregate(snapshot.id);
-    }
-
-    const createdAtMs = getTimestampMs(data.createdAt);
+    const aggregateGrades = normalizeAggregateGrades(data.aggregateGrades);
 
     Object.entries(aggregateGrades).forEach(([processKey, rating]) => {
       if (!isDaily5sProcessKey(processKey) || (rating !== 1 && rating !== 3 && rating !== 5)) {
@@ -421,15 +335,11 @@ export async function fetchDaily5sAggregatedMonthlyData(
       }
 
       rows.push({
-        id: `${snapshot.id}_${processKey}`,
         date,
         turma,
         process: processKey,
         rating,
-        status: rating === 1 ? 'not_updated' : 'updated',
-        hasIssue: rating === 1,
-        comments: [],
-        createdAtMs,
+        grade1Reason: [],
       });
     });
   }
@@ -457,7 +367,7 @@ export function deriveDaily5sMonthlyHeatmap(
     xAxisCategories.map((category) => [category.date, category]),
   );
 
-  const cellMap = new Map<string, { rating: Daily5sHeatmapValue; createdAtMs: number }>();
+  const cellMap = new Map<string, Daily5sHeatmapValue>();
 
   canonical.rows.forEach((row) => {
     const displayCategory = displayCategoryByDate.get(row.date);
@@ -465,20 +375,12 @@ export function deriveDaily5sMonthlyHeatmap(
       return;
     }
 
-    const processIndex = processIndexByKey.get(row.process);
-    if (processIndex === undefined) {
+    if (!processIndexByKey.has(row.process)) {
       return;
     }
 
     const cellKey = `${row.process}|${displayCategory.key}`;
-    const current = cellMap.get(cellKey);
-
-    if (!current || row.createdAtMs >= current.createdAtMs) {
-      cellMap.set(cellKey, {
-        rating: row.rating,
-        createdAtMs: row.createdAtMs,
-      });
-    }
+    cellMap.set(cellKey, row.rating);
   });
 
   const points: Daily5sHeatmapPoint[] = [];
@@ -486,7 +388,7 @@ export function deriveDaily5sMonthlyHeatmap(
   processDefs.forEach((processDef, processIndex) => {
     xAxisCategories.forEach((category, xIndex) => {
       const cellKey = `${processDef.key}|${category.key}`;
-      const rating = cellMap.get(cellKey)?.rating ?? 0;
+      const rating = cellMap.get(cellKey) ?? 0;
       points.push([xIndex, processIndex, rating]);
     });
   });
@@ -522,15 +424,15 @@ export function deriveDaily5sIssueAnalytics(
   );
 
   canonical.rows.forEach((row) => {
-    if (!row.hasIssue || row.comments.length === 0) {
-      return;
-    }
-
     if (row.date < range.from || row.date > range.to) {
       return;
     }
 
-    row.comments.forEach((reason) => {
+    if (row.rating !== 1 || row.grade1Reason.length === 0) {
+      return;
+    }
+
+    row.grade1Reason.forEach((reason) => {
       const turmaKey = `${row.date}|${row.turma}`;
       const turmaLabel = row.turma === 'A e C' ? 'A/C' : 'B/D';
 
@@ -626,7 +528,7 @@ export function deriveDaily5sIssueAnalytics(
 
 export function deriveDaily5sMonthlyScoreTrend(
   canonical: Daily5sCanonicalMonthlyData,
-  turma: Daily5sTurma,
+  turma: AuditTurma,
 ): Daily5sScoreTrendData {
   const labels = buildMonthDateKeys(canonical.monthKey);
   const totalsByDate: Record<string, number> = Object.fromEntries(
@@ -699,21 +601,26 @@ export function deriveDaily5sActionPlan(
   const range = normalizeRange(canonical.monthKey, startDateKey, endDateKey);
 
   const rows: Daily5sActionPlanRow[] = canonical.rows
-    .filter((row) => row.rating === 1 && row.comments.length > 0)
-    .filter((row) => row.date >= range.from && row.date <= range.to)
+    .filter(
+      (row) =>
+        row.rating === 1 &&
+        row.grade1Reason.length > 0 &&
+        row.date >= range.from &&
+        row.date <= range.to,
+    )
     .flatMap((row) =>
-      row.comments.map((reason) => {
+      row.grade1Reason.map((reason) => {
         const roster = DAILY5S_PROCESS_ROSTER[row.process];
 
         return {
-          id: `${row.id}_${reason}`,
+          id: `${row.date}_${row.turma}_${row.process}_${reason}`,
           date: row.date,
           turma: row.turma,
           process: DAILY5S_PROCESS_LABELS[row.process] ?? row.process,
           auditor: roster?.auditor || 'A definir',
           processResponsible: roster?.responsible || 'A definir',
           reason,
-          whoShouldAct: ACTION_OWNER_BY_REASON[reason] ?? 'Nao definido',
+          whoShouldAct: ACTION_OWNER_BY_REASON[reason] ?? 'Não definido',
         };
       }),
     );

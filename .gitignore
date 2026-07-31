@@ -32,6 +32,8 @@ yarn-error.log*
 # local .env files
 .env.local*
 .env
+.env.development
+.env.production
 
 # copilot prompt md files
 /.github/prompts
@@ -40,3 +42,4 @@ yarn-error.log*
 /.firebase/*
 .firebase/
 .firebase/hosting.ZGlzdFxzcGE.cache
+

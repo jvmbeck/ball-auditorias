@@ -14,7 +14,7 @@
     "build": "quasar build",
     "postinstall": "quasar prepare",
     "buildSPA": "quasar build -m spa",
-    "buildAndDeploy": "quasar build -m spa && firebase deploy --only hosting"
+    "deploy": "quasar build -m spa && firebase deploy --only hosting"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.4",

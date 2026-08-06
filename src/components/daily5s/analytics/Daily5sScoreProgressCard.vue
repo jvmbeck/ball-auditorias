@@ -38,11 +38,34 @@
           </div>
         </div>
 
-        <div class="kpi-row q-mb-sm">
-          <q-chip color="primary" text-color="white" icon="query_stats">
-            {{ todayPercentage }}% ({{ todayTotal }}/{{ DAILY5S_MAX_SCORE }})
+        <div class="score-kpis">
+          <q-chip color="primary" text-color="white" icon="today" class="score-chip">
+            <div class="score-chip__content">
+              <span class="score-chip__label">Hoje</span>
+
+              <strong class="score-chip__value">
+                {{ todayPercentageLabel }} - {{ todayTotal }}/{{ DAILY5S_MAX_SCORE }}
+              </strong>
+            </div>
+
+            <q-tooltip>
+              {{ kpiHint }}
+            </q-tooltip>
           </q-chip>
-          <span class="kpi-hint">{{ kpiHint }}</span>
+
+          <q-chip color="secondary" text-color="white" icon="calendar_month" class="score-chip">
+            <div class="score-chip__content">
+              <span class="score-chip__label">Média mensal</span>
+
+              <strong class="score-chip__value">
+                {{ monthlyPercentageLabel }} - {{ monthlyAverageTotal }}/{{ DAILY5S_MAX_SCORE }}
+              </strong>
+            </div>
+
+            <q-tooltip>
+              {{ monthlyKpiHint }}
+            </q-tooltip>
+          </q-chip>
         </div>
 
         <VChart autoresize :option="chartOption" class="chart" />
@@ -86,7 +109,7 @@ const turmaLegendPills: Array<{
 }> = [
   { label: 'A e C + B e D', value: 'combined', color: '#129e7b' },
   { label: 'A e C', value: 'ac', color: '#1f7ae0' },
-  { label: 'B e D', value: 'bd', color: '#f28e2b' },
+  { label: 'B e D', value: 'bd', color: '#d64545' },
 ];
 
 const subtitle = computed(() => `Progresso diário do mês sobre ${DAILY5S_MAX_SCORE} pontos`);
@@ -218,7 +241,7 @@ const selectedSeriesColor = computed(() => {
   }
 
   if (selectedTurmaView.value === 'bd') {
-    return '#f28e2b';
+    return '#d64545';
   }
 
   return '#129e7b';
@@ -259,6 +282,37 @@ const latestScoreIndex = computed(() => {
 const todayTotal = computed(() => selectedTrend.value.totalsByDate[todayDateKey.value] ?? 0);
 
 const todayPercentage = computed(() => toPercentage(todayTotal.value));
+const recordedMonthlyTotals = computed(() =>
+  selectedTrend.value.totals.filter((total) => total > 0),
+);
+
+const monthlyAverageTotal = computed(() => {
+  const totals = recordedMonthlyTotals.value;
+
+  if (!totals.length) {
+    return 0;
+  }
+
+  const sum = totals.reduce((accumulator, total) => accumulator + total, 0);
+
+  return Number((sum / totals.length).toFixed(1));
+});
+
+const monthlyPercentage = computed(() =>
+  Number(toPercentage(monthlyAverageTotal.value).toFixed(1)),
+);
+
+const monthlyAuditCount = computed(() => recordedMonthlyTotals.value.length);
+
+const monthlyKpiHint = computed(() => {
+  if (!monthlyAuditCount.value) {
+    return 'Nenhum resultado registrado neste mês.';
+  }
+
+  const auditLabel = monthlyAuditCount.value === 1 ? 'auditoria' : 'auditorias';
+
+  return `Média de ${monthlyAuditCount.value} ${auditLabel} no mês.`;
+});
 
 const kpiHint = computed(() => {
   if (todayTotal.value > 0) {
@@ -275,6 +329,16 @@ const kpiHint = computed(() => {
   return 'Sem resultado hoje.';
 });
 
+const hasTodayResult = computed(() => todayTotal.value > 0);
+
+const todayPercentageLabel = computed(() =>
+  hasTodayResult.value ? `${todayPercentage.value}%` : '—',
+);
+
+const monthlyPercentageLabel = computed(() =>
+  monthlyAuditCount.value ? `${monthlyPercentage.value}%` : '—',
+);
+
 function formatDateLabel(dateKey: string): string {
   const [year, month, day] = dateKey.split('-');
   if (!year || !month || !day) {
@@ -286,7 +350,7 @@ function formatDateLabel(dateKey: string): string {
 
 // Constants for goal and challenge percentages shown in the chart as dashed lines.
 const GOAL_PERCENTAGE = 75;
-const CHALLENGE_PERCENTAGE = 95;
+const CHALLENGE_PERCENTAGE = 90;
 
 interface MarkLineData {
   name: string;
@@ -465,11 +529,37 @@ watch(
   font-size: 0.85rem;
 }
 
-.kpi-row {
+.score-kpis {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.score-chip {
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 12px;
+}
+
+.score-chip__content {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.score-chip__label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.88;
+}
+
+.score-chip__value {
+  margin-top: 2px;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .legend-filter {

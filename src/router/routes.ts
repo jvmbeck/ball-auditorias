@@ -5,7 +5,11 @@ const routes: RouteRecordRaw[] = [
     path: '/auditor',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', name: 'auditor-home', component: () => import('pages/AuditorPage.vue') },
+      {
+        path: '',
+        name: 'auditor-home',
+        component: () => import('src/pages/auditor/AuditorPage.vue'),
+      },
     ],
     meta: { requiresAuth: true, allowedRoles: ['operator', 'admin'] },
   },
@@ -13,11 +17,16 @@ const routes: RouteRecordRaw[] = [
     path: '/admin',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', name: 'admin-home', component: () => import('pages/AdminPage.vue') },
+      { path: '', name: 'admin-home', component: () => import('src/pages/admin/AdminPage.vue') },
       {
         path: 'analytics',
         name: 'analytics',
-        component: () => import('pages/AnalyticsPage.vue'),
+        component: () => import('src/pages/admin/AnalyticsPage.vue'),
+      },
+      {
+        path: 'action-plans',
+        name: 'action-plans',
+        component: () => import('src/pages/admin/ActionPlansPage.vue'),
       },
     ],
     meta: { requiresAuth: true, allowedRoles: ['admin'] },

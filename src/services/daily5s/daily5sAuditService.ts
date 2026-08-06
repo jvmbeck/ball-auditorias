@@ -11,6 +11,7 @@ import type {
   Daily5sAuditDocument,
   Daily5sProcessResultDocument,
 } from 'src/types/daily5sDocuments';
+import { syncActionPlans } from 'src/services/actionPlans/actionPlansService';
 
 const AUDIT_COLLECTION = 'daily5sAudits';
 const RESULTS_COLLECTION = 'daily5sProcessResults';
@@ -222,49 +223,76 @@ export async function updateProcess(
   imageFiles: File[] | null = null,
   options?: Daily5sProcessData,
 ): Promise<void> {
-  const auditRef = doc(db, AUDIT_COLLECTION, auditDate);
-  const snapshot = await getDoc(auditRef);
-
-  if (!snapshot.exists()) {
-    if (!options?.inspectorId) {
-      throw new Error('Cannot create Daily 5S audit without inspector ID.');
-    }
-
-    const daily5sPayload = {
-      date: auditDate,
-      turma,
-      inspector: options.inspectorId,
-      aggregateGrades: {},
-      completedProcesses: 0,
-      createdAt: serverTimestamp(),
-    };
-
-    await setDoc(auditRef, daily5sPayload, { merge: true });
-  }
-
-  const resultId = `${auditDate}_${processKey}`;
-  const resultRef = doc(db, RESULTS_COLLECTION, resultId);
-  const existingResultSnapshot = await getDoc(resultRef);
-  const existingResult = existingResultSnapshot.exists()
-    ? (existingResultSnapshot.data() as Partial<Daily5sProcessResultDocument>)
-    : null;
-
   const rating = options?.rating;
-  const hasIssue = rating === 1;
+  const inspectorId = options?.inspectorId;
+
   if (rating == null) {
     throw new Error('Rating is required.');
   }
 
+  if (!inspectorId) {
+    throw new Error('Inspector ID is required.');
+  }
+
+  /*
+   * Load the existing audit once.
+   *
+   * If it exists, retain its current aggregate data.
+   * If it does not exist, create the initial data locally and in Firestore.
+   */
+  const auditRef = doc(db, AUDIT_COLLECTION, auditDate);
+  const auditSnapshot = await getDoc(auditRef);
+
+  let existingAudit: Partial<Daily5sAuditDocument>;
+
+  if (auditSnapshot.exists()) {
+    existingAudit = auditSnapshot.data();
+  } else {
+    existingAudit = {
+      date: auditDate,
+      turma,
+      inspector: inspectorId,
+      aggregateGrades: {},
+      completedProcesses: 0,
+    };
+
+    await setDoc(
+      auditRef,
+      {
+        ...existingAudit,
+        createdAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  /*
+   * Load the previous process result.
+   *
+   * This read is still necessary because existing images must be preserved
+   * and previous issue reasons are needed to synchronize action plans.
+   */
+  const resultId = `${auditDate}_${processKey}`;
+  const resultRef = doc(db, RESULTS_COLLECTION, resultId);
+  const existingResultSnapshot = await getDoc(resultRef);
+
+  const existingResult = existingResultSnapshot.exists()
+    ? (existingResultSnapshot.data() as Partial<Daily5sProcessResultDocument>)
+    : null;
+
+  const hasIssue = rating === 1;
+
   let processImageUrls = normalizeImageUrls(existingResult?.imageUrls);
   const webpSupported = await supportsWebP();
 
-  // Upload process images, preserving previous ones.
+  // Upload process images while preserving previously saved images.
   if (hasIssue && imageFiles?.length) {
     const uploadedImageUrls: string[] = [];
 
     for (const file of imageFiles) {
       try {
         const processed = webpSupported ? await resizeAndConvertImage(file) : file;
+
         const uploadFile =
           processed instanceof File
             ? processed
@@ -275,6 +303,7 @@ export async function updateProcess(
         uploadedImageUrls.push(await uploadImage(auditDate, processKey, uploadFile));
       } catch (error) {
         console.error('Image processing failed, uploading original file', error);
+
         uploadedImageUrls.push(await uploadImage(auditDate, processKey, file));
       }
     }
@@ -288,7 +317,10 @@ export async function updateProcess(
 
   const normalizedProcessImageUrls = normalizeImageUrls(processImageUrls);
 
+  const previousGrade1Reasons = normalizeGrade1Reasons(existingResult?.grade1Reason);
+
   const normalizedGrade1Reason = hasIssue ? normalizeGrade1Reasons(options?.grade1Reason) : [];
+
   const normalizedGrade1Comment = hasIssue ? options?.grade1Comment?.trim() || null : null;
 
   const resultPayload: Daily5sProcessResultDocument = {
@@ -304,13 +336,21 @@ export async function updateProcess(
 
   await setDoc(resultRef, resultPayload, { merge: true });
 
-  const auditSnapshot = await getDoc(auditRef);
-  const existing = auditSnapshot.exists()
-    ? (auditSnapshot.data() as Partial<Daily5sAuditDocument>)
-    : null;
+  await syncActionPlans({
+    auditDate,
+    processKey,
+    auditorId: inspectorId,
+    previousReasons: previousGrade1Reasons,
+    currentReasons: normalizedGrade1Reason,
+  });
 
+  /*
+   * Reuse the audit data loaded at the beginning.
+   *
+   * Do not call getDoc(auditRef) again.
+   */
   const aggregateGrades = {
-    ...(existing?.aggregateGrades ?? {}),
+    ...(existingAudit.aggregateGrades ?? {}),
     [processKey]: rating,
   } as Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>;
 

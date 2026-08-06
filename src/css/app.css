@@ -1,1 +1,51 @@
 /* app global css */
+
+/* Hero card styles used in the admin specific pages */
+
+.hero-card {
+  padding: 24px;
+  border-radius: 28px;
+  background: linear-gradient(140deg, rgba(17, 52, 74, 0.96), rgba(34, 86, 106, 0.92)), #17343d;
+  color: #ffffff;
+  box-shadow: 0 20px 56px rgba(20, 43, 55, 0.2);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  opacity: 0.78;
+}
+
+.page-title {
+  margin: 0;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.page-subtitle {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.97rem;
+}
+
+.section-header {
+  padding: 0 4px;
+}
+
+/*End of Hero card styles */
+
+.gradient-background {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(67, 109, 148, 0.273), transparent 34%),
+    radial-gradient(circle at 90% 0%, rgba(43, 39, 100, 0.168), transparent 28%),
+    linear-gradient(180deg, #f6f9fb 0%, #ecf3f6 100%);
+}
+
+.page-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+}

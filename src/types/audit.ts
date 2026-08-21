@@ -53,6 +53,7 @@ export interface Daily5sScoreTrendData {
   totals: number[];
   percentagesByDate: Record<string, number>;
   totalsByDate: Record<string, number>;
+  maxPossibleScoreByDate: Record<string, number>;
 }
 
 export type Daily5sHeatmapValue = Daily5sRatingValue | 0;
@@ -87,6 +88,10 @@ export interface Daily5sCanonicalMonthlyData {
   startKey: string;
   endKey: string;
   rows: Daily5sCanonicalRow[];
+}
+
+export interface Daily5sAggregatedMonthlyData extends Daily5sCanonicalMonthlyData {
+  maxPossibleScoreByDate: Record<string, number>;
 }
 
 export interface Daily5sIssueAnalyticsBucket {

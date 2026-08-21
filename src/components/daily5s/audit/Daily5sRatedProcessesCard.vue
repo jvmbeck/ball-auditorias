@@ -158,7 +158,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useAuthStore } from 'src/stores/auth.store';
 import { subscribeDaily5sRatedProcessKeysByDate } from 'src/services/daily5s';
-import { DAILY5S_PROCESS_DEFINITIONS } from 'src/services/daily5s/daily5sDefinitions';
+import { ACTIVE_DAILY5S_PROCESS_DEFINITIONS } from 'src/services/daily5s/daily5sDefinitions';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import type { QTableProps } from 'quasar';
 import type { Daily5sAuditProcessKey } from 'src/types/audit';
@@ -233,7 +233,7 @@ const loading = ref(false);
 const ratedProcessKeys = ref<Daily5sAuditProcessKey[]>([]);
 const unsubscribeRealtime = ref<(() => void) | null>(null);
 
-const totalCount = computed(() => DAILY5S_PROCESS_DEFINITIONS.length);
+const totalCount = computed(() => ACTIVE_DAILY5S_PROCESS_DEFINITIONS.length);
 const ratedCount = computed(() => ratedProcessKeys.value.length);
 
 const ratedProcessKeySet = computed(() => new Set<Daily5sAuditProcessKey>(ratedProcessKeys.value));
@@ -253,7 +253,7 @@ function getLocalDateString(): string {
 }
 
 const rows = computed<ProcessRow[]>(() =>
-  DAILY5S_PROCESS_DEFINITIONS.map((definition) => {
+  ACTIVE_DAILY5S_PROCESS_DEFINITIONS.map((definition) => {
     const roster = DAILY5S_PROCESS_ROSTER[definition.key];
     const rated = ratedProcessKeySet.value.has(definition.key);
 

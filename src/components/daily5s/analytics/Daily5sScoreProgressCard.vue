@@ -44,7 +44,9 @@
               <span class="score-chip__label">Hoje</span>
 
               <strong class="score-chip__value">
-                {{ todayPercentageLabel }} - {{ todayTotal }}/{{ DAILY5S_MAX_SCORE }}
+                {{ todayPercentageLabel }} - {{ todayTotal }}/{{
+                  selectedTrend.maxPossibleScoreByDate[todayDateKey] ?? 0
+                }}
               </strong>
             </div>
 
@@ -58,7 +60,7 @@
               <span class="score-chip__label">Média mensal</span>
 
               <strong class="score-chip__value">
-                {{ monthlyPercentageLabel }} - {{ monthlyAverageTotal }}/{{ DAILY5S_MAX_SCORE }}
+                {{ monthlyPercentageLabel }}
               </strong>
             </div>
 
@@ -81,7 +83,6 @@ import { use } from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, MarkLineComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { DAILY5S_MAX_SCORE } from 'src/services/daily5s/analytics.daily5sCanonical';
 import { useAnalyticsStore } from 'src/stores/analytics.store';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, MarkLineComponent]);
@@ -112,32 +113,7 @@ const turmaLegendPills: Array<{
   { label: 'B e D', value: 'bd', color: '#d64545' },
 ];
 
-const subtitle = computed(() => `Progresso diário do mês sobre ${DAILY5S_MAX_SCORE} pontos`);
-
-function toPercentage(score: number): number {
-  return Number(((score / DAILY5S_MAX_SCORE) * 100).toFixed(1));
-}
-
-function buildTotalsByDate(
-  labels: string[],
-  totals: number[],
-): {
-  totalsByDate: Record<string, number>;
-  percentagesByDate: Record<string, number>;
-  percentages: number[];
-} {
-  const percentages = totals.map((score) => toPercentage(score));
-  const totalsByDate = Object.fromEntries(labels.map((date, index) => [date, totals[index] ?? 0]));
-  const percentagesByDate = Object.fromEntries(
-    labels.map((date, index) => [date, percentages[index] ?? 0]),
-  );
-
-  return {
-    totalsByDate,
-    percentagesByDate,
-    percentages,
-  };
-}
+const subtitle = computed(() => `Progresso diário em relação à pontuação máxima de cada auditoria`);
 
 const scoreTrend = computed(() => {
   if (analyticsStore.daily5sMonthlyScoreTrendByTurma.monthKey !== props.monthKey) {
@@ -148,60 +124,123 @@ const scoreTrend = computed(() => {
         percentages: [],
         percentagesByDate: {},
         totalsByDate: {},
+        maxPossibleScoreByDate: {},
       },
       ac: {
         totals: [],
         percentages: [],
         percentagesByDate: {},
         totalsByDate: {},
+        maxPossibleScoreByDate: {},
       },
       bd: {
         totals: [],
         percentages: [],
         percentagesByDate: {},
         totalsByDate: {},
+        maxPossibleScoreByDate: {},
       },
     };
   }
 
   const acTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.ac;
   const bdTrend = analyticsStore.daily5sMonthlyScoreTrendByTurma.bd;
+
   const labels = Array.from(new Set([...acTrend.labels, ...bdTrend.labels])).sort();
 
   const acTotalsByDate = Object.fromEntries(
     acTrend.labels.map((date, index) => [date, acTrend.totals[index] ?? 0]),
   );
+
   const bdTotalsByDate = Object.fromEntries(
     bdTrend.labels.map((date, index) => [date, bdTrend.totals[index] ?? 0]),
   );
 
+  const acPercentagesByDate = Object.fromEntries(
+    acTrend.labels.map((date, index) => [date, acTrend.percentages[index] ?? 0]),
+  );
+
+  const bdPercentagesByDate = Object.fromEntries(
+    bdTrend.labels.map((date, index) => [date, bdTrend.percentages[index] ?? 0]),
+  );
+
   const acTotals = labels.map((date) => acTotalsByDate[date] ?? 0);
+
   const bdTotals = labels.map((date) => bdTotalsByDate[date] ?? 0);
+
+  const acPercentages = labels.map((date) => acPercentagesByDate[date] ?? 0);
+
+  const bdPercentages = labels.map((date) => bdPercentagesByDate[date] ?? 0);
+
   const combinedTotals = labels.map((_, index) => (acTotals[index] ?? 0) + (bdTotals[index] ?? 0));
 
-  const ac = buildTotalsByDate(labels, acTotals);
-  const bd = buildTotalsByDate(labels, bdTotals);
-  const combined = buildTotalsByDate(labels, combinedTotals);
+  const combinedPercentages = labels.map((_, index) => {
+    const acTotal = acTotals[index] ?? 0;
+    const bdTotal = bdTotals[index] ?? 0;
+
+    if (acTotal > 0) {
+      return acPercentages[index] ?? 0;
+    }
+
+    if (bdTotal > 0) {
+      return bdPercentages[index] ?? 0;
+    }
+
+    return 0;
+  });
+
+  const combinedPercentagesByDate = Object.fromEntries(
+    labels.map((date, index) => [date, combinedPercentages[index] ?? 0]),
+  );
+
+  const combinedMaxPossibleScoreByDate = Object.fromEntries(
+    labels.map((date, index) => {
+      const acTotal = acTotals[index] ?? 0;
+      const bdTotal = bdTotals[index] ?? 0;
+
+      if (acTotal > 0) {
+        return [date, acTrend.maxPossibleScoreByDate[date] ?? 0];
+      }
+
+      if (bdTotal > 0) {
+        return [date, bdTrend.maxPossibleScoreByDate[date] ?? 0];
+      }
+
+      return [date, 0];
+    }),
+  );
 
   return {
     labels,
+
     combined: {
       totals: combinedTotals,
-      percentages: combined.percentages,
-      percentagesByDate: combined.percentagesByDate,
-      totalsByDate: combined.totalsByDate,
+      percentages: combinedPercentages,
+      percentagesByDate: combinedPercentagesByDate,
+      totalsByDate: Object.fromEntries(
+        labels.map((date, index) => [date, combinedTotals[index] ?? 0]),
+      ),
+      maxPossibleScoreByDate: combinedMaxPossibleScoreByDate,
     },
+
     ac: {
       totals: acTotals,
-      percentages: ac.percentages,
-      percentagesByDate: ac.percentagesByDate,
-      totalsByDate: ac.totalsByDate,
+      percentages: acPercentages,
+      percentagesByDate: Object.fromEntries(
+        labels.map((date, index) => [date, acPercentages[index] ?? 0]),
+      ),
+      totalsByDate: Object.fromEntries(labels.map((date, index) => [date, acTotals[index] ?? 0])),
+      maxPossibleScoreByDate: acTrend.maxPossibleScoreByDate,
     },
+
     bd: {
       totals: bdTotals,
-      percentages: bd.percentages,
-      percentagesByDate: bd.percentagesByDate,
-      totalsByDate: bd.totalsByDate,
+      percentages: bdPercentages,
+      percentagesByDate: Object.fromEntries(
+        labels.map((date, index) => [date, bdPercentages[index] ?? 0]),
+      ),
+      totalsByDate: Object.fromEntries(labels.map((date, index) => [date, bdTotals[index] ?? 0])),
+      maxPossibleScoreByDate: bdTrend.maxPossibleScoreByDate,
     },
   };
 });
@@ -220,6 +259,7 @@ const selectedTrend = computed(() => {
     percentages: scoreTrend.value.combined.percentages,
     percentagesByDate: scoreTrend.value.combined.percentagesByDate,
     totalsByDate: scoreTrend.value.combined.totalsByDate,
+    maxPossibleScoreByDate: scoreTrend.value.combined.maxPossibleScoreByDate,
   };
 });
 
@@ -281,25 +321,12 @@ const latestScoreIndex = computed(() => {
 
 const todayTotal = computed(() => selectedTrend.value.totalsByDate[todayDateKey.value] ?? 0);
 
-const todayPercentage = computed(() => toPercentage(todayTotal.value));
-const recordedMonthlyTotals = computed(() =>
-  selectedTrend.value.totals.filter((total) => total > 0),
-);
-
-const monthlyAverageTotal = computed(() => {
-  const totals = recordedMonthlyTotals.value;
-
-  if (!totals.length) {
-    return 0;
-  }
-
-  const sum = totals.reduce((accumulator, total) => accumulator + total, 0);
-
-  return Number((sum / totals.length).toFixed(1));
+const todayPercentage = computed(() => {
+  return selectedTrend.value.percentagesByDate[todayDateKey.value] ?? 0;
 });
 
-const monthlyPercentage = computed(() =>
-  Number(toPercentage(monthlyAverageTotal.value).toFixed(1)),
+const recordedMonthlyTotals = computed(() =>
+  selectedTrend.value.totals.filter((total) => total > 0),
 );
 
 const monthlyAuditCount = computed(() => recordedMonthlyTotals.value.length);
@@ -334,6 +361,24 @@ const hasTodayResult = computed(() => todayTotal.value > 0);
 const todayPercentageLabel = computed(() =>
   hasTodayResult.value ? `${todayPercentage.value}%` : '—',
 );
+
+const recordedMonthlyPercentages = computed(() =>
+  selectedTrend.value.percentages.filter(
+    (_, index) => (selectedTrend.value.totals[index] ?? 0) > 0,
+  ),
+);
+
+const monthlyPercentage = computed(() => {
+  const percentages = recordedMonthlyPercentages.value;
+
+  if (!percentages.length) {
+    return 0;
+  }
+
+  const sum = percentages.reduce((accumulator, percentage) => accumulator + percentage, 0);
+
+  return Number((sum / percentages.length).toFixed(1));
+});
 
 const monthlyPercentageLabel = computed(() =>
   monthlyAuditCount.value ? `${monthlyPercentage.value}%` : '—',
@@ -373,12 +418,14 @@ const chartOption = computed(() => ({
 
       if (!point) return '';
 
+      const date = scoreTrend.value.labels[point.dataIndex] ?? '';
       const total = selectedTrend.value.totals[point.dataIndex] ?? 0;
+      const maxScore = selectedTrend.value.maxPossibleScoreByDate[date] ?? 0;
 
       return `
     ${point.axisValue} - Pontuação<br/>
     Porcentagem: <b>${point.value}%</b><br/>
-    Soma: <b>${total}/${DAILY5S_MAX_SCORE}</b>
+    Soma: <b>${total}/${maxScore}</b>
   `;
     },
   },

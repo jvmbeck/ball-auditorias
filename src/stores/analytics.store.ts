@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import {
-  deriveDaily5sActionPlan,
   deriveDaily5sIssueAnalytics,
   deriveDaily5sMonthlyHeatmap,
   deriveDaily5sMonthlyScoreTrend,
@@ -10,7 +9,6 @@ import {
   fetchDaily5sCanonicalMonthlyData,
 } from 'src/services/daily5s';
 import type {
-  Daily5sActionPlanData,
   Daily5sCanonicalMonthlyData,
   Daily5sIssueAnalyticsData,
   Daily5sMonthlyHeatmapData,
@@ -35,6 +33,7 @@ const EMPTY_DAILY5S_SCORE_TREND: Daily5sScoreTrendData = {
   totals: [],
   percentagesByDate: {},
   totalsByDate: {},
+  maxPossibleScoreByDate: {},
 };
 
 const EMPTY_DAILY5S_SCORE_TRENDS_BY_TURMA: Daily5sMonthlyScoreTrendByTurmaData = {
@@ -109,17 +108,6 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       endDateKey,
       topN,
     );
-  }
-
-  function getDaily5sActionPlanByRange(
-    startDateKey?: string,
-    endDateKey?: string,
-  ): Daily5sActionPlanData {
-    if (!daily5sCanonical.value.monthKey) {
-      return { rows: [], total: 0 };
-    }
-
-    return deriveDaily5sActionPlan(daily5sCanonical.value, startDateKey, endDateKey);
   }
 
   async function loadDaily5sAnalytics(monthKey: string, force = false): Promise<void> {
@@ -200,6 +188,5 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     refreshDaily5sAnalytics,
     getDaily5sIssueAnalyticsByRange,
     getDaily5sTopRating1ByProcess,
-    getDaily5sActionPlanByRange,
   };
 });

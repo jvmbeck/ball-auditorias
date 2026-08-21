@@ -113,8 +113,8 @@ import { useRouter } from 'vue-router';
 import Daily5sProcessCard from 'src/components/daily5s/audit/Daily5sProcessCard.vue';
 import Daily5sRatedProcessesCard from 'src/components/daily5s/audit/Daily5sRatedProcessesCard.vue';
 import {
-  DAILY5S_BACKEND_PROCESS_DEFINITIONS,
-  DAILY5S_FRONTEND_PROCESS_DEFINITIONS,
+  ACTIVE_DAILY5S_BACKEND_PROCESS_DEFINITIONS,
+  ACTIVE_DAILY5S_FRONTEND_PROCESS_DEFINITIONS,
   DAILY5S_PROCESS_DEFINITIONS,
 } from 'src/services/daily5s/daily5sDefinitions';
 import { getTurmaForDate } from 'src/services/daily5s/analytics.daily5sCanonical';
@@ -166,22 +166,22 @@ function onAuditDateChange(value: string | number | null): void {
 }
 
 const FRONT_END_PROCESS_KEY_SET = new Set(
-  DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => process.key),
+  ACTIVE_DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => process.key),
 );
 
 const BACK_END_PROCESS_KEY_SET = new Set(
-  DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => process.key),
+  ACTIVE_DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => process.key),
 );
 
 const frontEndProcessOptions = computed(() =>
-  DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => ({
+  ACTIVE_DAILY5S_FRONTEND_PROCESS_DEFINITIONS.map((process) => ({
     label: process.label,
     value: process.key,
   })),
 );
 
 const backEndProcessOptions = computed(() =>
-  DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => ({
+  ACTIVE_DAILY5S_BACKEND_PROCESS_DEFINITIONS.map((process) => ({
     label: process.label,
     value: process.key,
   })),

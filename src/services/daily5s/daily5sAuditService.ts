@@ -12,6 +12,10 @@ import type {
   Daily5sProcessResultDocument,
 } from 'src/types/daily5sDocuments';
 import { syncActionPlans } from 'src/services/actionPlans/actionPlansService';
+import {
+  ACTIVE_DAILY5S_PROCESS_DEFINITIONS,
+  DAILY5S_MAXIMUM_DAILY_POINTS,
+} from './daily5sDefinitions';
 
 const AUDIT_COLLECTION = 'daily5sAudits';
 const RESULTS_COLLECTION = 'daily5sProcessResults';
@@ -190,6 +194,9 @@ export async function ensureAudit(
   const auditRef = doc(db, AUDIT_COLLECTION, date);
   const snapshot = await getDoc(auditRef);
 
+  const auditableProcessCount = ACTIVE_DAILY5S_PROCESS_DEFINITIONS.length;
+  const maxPossibleScore = DAILY5S_MAXIMUM_DAILY_POINTS;
+
   if (!snapshot.exists()) {
     const daily5sPayload = {
       date,
@@ -197,8 +204,14 @@ export async function ensureAudit(
       inspector,
       aggregateGrades: {},
       completedProcesses: 0,
+      auditableProcessCount,
+      maxPossibleScore,
       createdAt: serverTimestamp(),
     };
+
+    console.log(
+      `Creating new Daily 5S audit document for ${date} with data: ${JSON.stringify(daily5sPayload)}`,
+    );
 
     await setDoc(auditRef, daily5sPayload);
   }

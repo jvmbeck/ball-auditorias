@@ -14,7 +14,8 @@ export interface Daily5sAuditDocument {
   aggregateGrades: Partial<Record<Daily5sAuditProcessKey, Daily5sRatingValue>>;
 
   completedProcesses: number;
-
+  auditableProcessCount: number;
+  maxPossibleScore: number;
   createdAt: Timestamp | FieldValue;
   completedAt?: Timestamp | FieldValue;
 }

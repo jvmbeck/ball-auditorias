@@ -65,7 +65,9 @@
             <div>
               <div class="kpi-card__score">{{ scorePercentage }}<span>%</span></div>
 
-              <div class="kpi-card__points">{{ earnedPoints }} de {{ maximumPoints }} pontos</div>
+              <div class="kpi-card__points">
+                {{ earnedPoints }} de {{ DAILY5S_MAXIMUM_DAILY_POINTS }} pontos
+              </div>
             </div>
 
             <div
@@ -183,6 +185,10 @@
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import {
+  ACTIVE_DAILY5S_PROCESS_DEFINITIONS,
+  DAILY5S_MAXIMUM_DAILY_POINTS,
+} from 'src/services/daily5s/daily5sDefinitions';
 
 import type { Unsubscribe } from 'firebase/firestore';
 
@@ -192,9 +198,7 @@ import {
 } from 'src/services/daily5s/dailyKPI';
 import type { Daily5sAuditDocument } from 'src/types/daily5sDocuments';
 
-const TOTAL_PROCESS_COUNT = 37;
-const MAX_GRADE = 5;
-const MAXIMUM_DAILY_POINTS = TOTAL_PROCESS_COUNT * MAX_GRADE; // 185
+const TOTAL_PROCESS_COUNT = ACTIVE_DAILY5S_PROCESS_DEFINITIONS.length;
 
 const audit = ref<Daily5sAuditDocument | null>(null);
 const loading = ref(true);
@@ -223,10 +227,6 @@ const earnedPoints = computed(() => {
 
 const totalProcessCount = computed(() => {
   return TOTAL_PROCESS_COUNT;
-});
-
-const maximumPoints = computed(() => {
-  return totalProcessCount.value * MAX_GRADE;
 });
 
 const scorePercentage = computed(() => {
@@ -340,7 +340,7 @@ function calculateAuditScore(auditDocument: Daily5sAuditDocument | null): number
 
   const earnedPoints = grades.reduce((total, grade) => total + grade, 0);
 
-  return Math.round((earnedPoints / MAXIMUM_DAILY_POINTS) * 100);
+  return Math.round((earnedPoints / DAILY5S_MAXIMUM_DAILY_POINTS) * 100);
 }
 async function loadPreviousAudit(): Promise<void> {
   previousAuditLoading.value = true;

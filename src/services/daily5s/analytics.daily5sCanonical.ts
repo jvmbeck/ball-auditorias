@@ -3,16 +3,19 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DAILY5S_PROCESS_ROSTER } from 'src/data/daily5sProcessRoster';
 import {
   DAILY5S_ISSUE_REASONS,
+  DAILY5S_MAXIMUM_DAILY_POINTS,
   DAILY5S_PROCESS_DEFINITIONS,
   DAILY5S_PROCESS_LABELS,
   isDaily5sIssueReason,
   isDaily5sProcessKey,
+  DAILY5S_LEGACY_MAXIMUM_DAILY_POINTS,
 } from 'src/services/daily5s/daily5sDefinitions';
 import type {
   Daily5sActionPlanData,
   Daily5sActionPlanRow,
   Daily5sAuditProcessKey,
   Daily5sCanonicalMonthlyData,
+  Daily5sAggregatedMonthlyData,
   Daily5sCanonicalRow,
   Daily5sHeatmapCategory,
   Daily5sHeatmapPoint,
@@ -33,6 +36,7 @@ import type {
 import { ACTION_OWNER_BY_REASON } from 'src/types/actionPlans';
 import { toDateKey } from 'src/utils/dateFormatting';
 import type { Daily5sAuditDocument } from 'src/types/daily5sDocuments';
+import { toPercentage } from 'src/utils/toPercentage';
 
 const ISSUE_REASON_COLORS: Record<Daily5sIssueReason, string> = {
   'Latas acumuladas': '#d64545',
@@ -47,7 +51,7 @@ const TURMA_ORDER: AuditTurma[] = ['A e C', 'B e D'];
 // The cycle repeats every 8 days (4 days A e C, then 4 days B e D).
 const TURMA_EPOCH = '2026-06-29'; // A e C block starts here
 
-export const DAILY5S_MAX_SCORE = 185;
+export const DAILY5S_MAX_SCORE = DAILY5S_MAXIMUM_DAILY_POINTS;
 
 interface DateRange {
   from: string;
@@ -210,10 +214,6 @@ function buildDisplayCategories(monthKey: string): Daily5sHeatmapCategory[] {
   });
 }
 
-function toPercentage(score: number): number {
-  return Number(((score / DAILY5S_MAX_SCORE) * 100).toFixed(1));
-}
-
 function normalizeRange(monthKey: string, startDateKey?: string, endDateKey?: string): DateRange {
   const { startKey, endKey } = toMonthBounds(monthKey);
 
@@ -303,10 +303,9 @@ export async function fetchDaily5sCanonicalMonthlyData(
     rows,
   };
 }
-
 export async function fetchDaily5sAggregatedMonthlyData(
   monthKey: string,
-): Promise<Daily5sCanonicalMonthlyData> {
+): Promise<Daily5sAggregatedMonthlyData> {
   const { startKey, endKey, monthKey: normalizedMonthKey } = toMonthBounds(monthKey);
 
   const auditsQuery = query(
@@ -314,18 +313,30 @@ export async function fetchDaily5sAggregatedMonthlyData(
     where('date', '>=', startKey),
     where('date', '<=', endKey),
   );
+
   const auditSnapshots = await getDocs(auditsQuery);
 
   const rows: Daily5sCanonicalRow[] = [];
+  const maxPossibleScoreByDate: Record<string, number> = {};
 
   for (const snapshot of auditSnapshots.docs) {
     const data = snapshot.data() as Partial<Daily5sAuditDocument>;
+
     const date = typeof data.date === 'string' ? data.date : null;
     const turma = data.turma === 'A e C' || data.turma === 'B e D' ? data.turma : null;
 
     if (!date || !turma) {
       continue;
     }
+
+    /*
+     * New audits have maxPossibleScore stored on the document.
+     * Old audits can fall back to the historical maximum.
+     */
+    maxPossibleScoreByDate[date] =
+      typeof data.maxPossibleScore === 'number'
+        ? data.maxPossibleScore
+        : DAILY5S_LEGACY_MAXIMUM_DAILY_POINTS;
 
     const aggregateGrades = normalizeAggregateGrades(data.aggregateGrades);
 
@@ -349,6 +360,7 @@ export async function fetchDaily5sAggregatedMonthlyData(
     startKey,
     endKey,
     rows,
+    maxPossibleScoreByDate,
   };
 }
 
@@ -525,12 +537,12 @@ export function deriveDaily5sIssueAnalytics(
     byProcess,
   };
 }
-
 export function deriveDaily5sMonthlyScoreTrend(
-  canonical: Daily5sCanonicalMonthlyData,
+  canonical: Daily5sAggregatedMonthlyData,
   turma: AuditTurma,
 ): Daily5sScoreTrendData {
   const labels = buildMonthDateKeys(canonical.monthKey);
+
   const totalsByDate: Record<string, number> = Object.fromEntries(
     labels.map((dateKey) => [dateKey, 0]),
   );
@@ -544,7 +556,14 @@ export function deriveDaily5sMonthlyScoreTrend(
   });
 
   const totals = labels.map((date) => totalsByDate[date] ?? 0);
-  const percentages = totals.map((score) => toPercentage(score));
+
+  const percentages = labels.map((date) => {
+    const score = totalsByDate[date] ?? 0;
+    const maxPossibleScore = canonical.maxPossibleScoreByDate[date] ?? 0;
+
+    return toPercentage(score, maxPossibleScore);
+  });
+
   const percentagesByDate = Object.fromEntries(
     labels.map((date, index) => [date, percentages[index] ?? 0]),
   );
@@ -555,6 +574,7 @@ export function deriveDaily5sMonthlyScoreTrend(
     percentages,
     totalsByDate,
     percentagesByDate,
+    maxPossibleScoreByDate: canonical.maxPossibleScoreByDate ?? {},
   };
 }
 

@@ -148,7 +148,7 @@
       </section>
     </div>
     <div class="text-body1 text-weight-light text-center q-mt-xl text-grey-9">
-      Sistema de Auditoria 5S • v1.0.2 • Desenvolvido por João Vitor Madrid Beck
+      Sistema de Auditoria 5S • v1.0.3 • Desenvolvido por João Vitor Madrid Beck
     </div>
   </q-page>
 </template>

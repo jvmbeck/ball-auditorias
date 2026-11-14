@@ -1,94 +1,112 @@
-# Auth Boilerplate (auth-boilerplate)
+# Ball Auditorias
 
-Firebase Auth + Pinia + Quasar starter focused on a clean, reusable auth architecture.
+A web application for digitizing factory 5S audits, recording process evaluations, and organizing audit data for analysis.
 
-## Quick start
+**[Live Application](https://ball-auditorias.web.app/)** · **[Source Code](https://github.com/jvmbeck/ball-auditorias)**
 
-1. Install dependencies.
-2. Create your .env file with Firebase config.
-3. Start the app in development mode.
-4. Open /login and sign in.
-5. Confirm authenticated users are redirected away from /login to /.
-6. Confirm unauthenticated users are redirected from protected routes to /login.
+## Overview
+
+Ball Auditorias was developed to support factory quality-audit workflows by replacing manual audit records with a centralized digital application.
+
+The system allows users to record daily audit results across industrial processes and provides a structured way to review evaluations and analyze collected data.
+
+The application was previously used in a factory environment. This project provided practical experience translating an operational workflow into a web application, from data collection to visualization.
+
+## Features
+
+- **Digital audit recording:** Record daily 5S audit evaluations through a web interface.
+- **Process evaluation:** Organize audit results across 37 industrial processes, using a 1, 3, and 5 rating scale.
+- **Audit history:** Store audit records for subsequent consultation and analysis.
+- **Action plans:** Maintain action-plan records associated with the audit workflow.
+- **Data visualization:** Use charts to make audit results easier to interpret.
+- **Cloud-backed application:** Use Firebase services to support the application's data and deployment infrastructure.
+
+## Screenshots
+
+![Admin Dashboard]<img width="1910" height="956" alt="image" src="https://github.com/user-attachments/assets/23396407-7f9d-4970-bad3-8a94b0117a44" />
+
+### Audit Dashboard
+
+![Audit dashboard]<img width="1150" height="555" alt="image" src="https://github.com/user-attachments/assets/c49a7d71-3208-4460-9ae3-4dce2e3c3941" />
+<img width="1136" height="887" alt="image" src="https://github.com/user-attachments/assets/f9a3a71a-047f-462f-a43b-4ead3111b673" />
+
+*Overview of audit results and visual summaries.*
+
+### Daily Audit
+
+![Daily audit interface]<img width="1443" height="602" alt="image" src="https://github.com/user-attachments/assets/75a149be-a0ca-492c-89d2-a6399f691225" />
+
+*Interface for recording process evaluations.*
+
+### Action Plans
+
+![Action plan interface]<img width="1458" height="794" alt="image" src="https://github.com/user-attachments/assets/794e308b-c5cb-449b-8c9c-841b0279295d" />
+
+*Action-plan records used to support follow-up activities.*
+
+## Tech Stack
+
+| Technology | Purpose |
+|---|---|
+| Vue 3 | Frontend framework |
+| Quasar | UI framework and application tooling |
+| TypeScript | Static typing |
+| Pinia | Application state management |
+| Firebase | Backend services and cloud infrastructure |
+| ECharts | Data visualization |
+| Vue ECharts | Integration of ECharts with Vue |
+| Vue Router | Client-side routing |
+
+## Architecture
+
+The application is built as a Vue single-page application using Quasar and TypeScript.
+
+Pinia manages application state, while Firebase provides cloud services. ECharts, integrated through Vue ECharts, supports the presentation of audit data through visualizations.
+
+This stack supports a separation between the user interface, application state, cloud-backed data operations, and data visualization.
+
+## Engineering Focus
+
+The project involved translating a factory audit workflow into a digital system, with particular attention to:
+
+- Representing audit evaluations and related records in an application data model.
+- Supporting structured evaluations across multiple industrial processes.
+- Organizing audit data for historical consultation and visual analysis.
+- Integrating frontend application state with Firebase services.
+- Presenting collected data through interactive charts.
+
+## Running Locally
+
+The application uses Quasar CLI and npm-compatible tooling.
+
+Prerequisites:
+- Node.js and a compatible package manager.
+- Firebase project configuration and access to the required Firebase services.
+
+To install dependencies:
 
 ```bash
 npm install
-npm install firebase
-npm install dotenv --save
-npm run dev
 ```
 
-## Install
-
-```bash
-npm install
-npm install firebase
-npm install dotenv --save
-```
-
-## Environment variables
-
-Create a .env file in the project root. These values are consumed by src/boot/firebase.js.
-
-```bash
-FIREBASE_API_KEY=your_api_key
-FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-FIREBASE_APP_ID=your_app_id
-FIREBASE_MEASUREMENT_ID=your_measurement_id
-```
-
-## Run
+To start the development server:
 
 ```bash
 npm run dev
 ```
 
-Notes:
+To build the application:
 
-- FIREBASE_MEASUREMENT_ID is optional if you are not using Analytics.
-- Use separate .env files per environment when needed (for example .env.development and .env.production).
-- Do not commit real secrets to public repositories.
-
-## Auth lifecycle
-
-This project keeps listener wiring in the boot layer and keeps state logic in the store.
-
-```text
-App boot
-  -> src/boot/firebase.js runs
-  -> Firebase app/auth/db are initialized
-  -> A single onAuthStateChanged listener is attached (with duplicate-listener protection)
-  -> Listener fires with current user (or null)
-  -> authStore.syncAuthState(user) updates:
-       - firebaseUser
-       - profile (from Firestore when user exists)
-       - initialized = true
-  -> authReady promise resolves after first auth sync
-  -> router guard continues navigation safely
+```bash
+npm run build
 ```
 
-## Routing safeguards
+Firebase configuration and service permissions must be set up appropriately for the application to run against a Firebase project. Do not use production credentials or unrestricted production data for local development.
 
-The router waits for auth initialization before applying redirects.
+## Project Status
 
-- If auth is not initialized, guard waits for authReady with an 8s timeout fallback.
-- Unauthenticated users are redirected to /login for protected and non-public routes.
-- Authenticated users are redirected to / when trying to access guest-only routes like /login.
-- Public routes (for example the not-found route) remain accessible without auth.
+Previously used in a factory environment. The repository is maintained as a portfolio project demonstrating the development of a cloud-backed industrial audit application.
 
-Route meta currently used:
+## Author
 
-- requiresAuth: only authenticated users can access.
-- guestOnly: only unauthenticated users can access.
-- public: always accessible.
-
-## Why this architecture is reusable
-
-- Boot owns external subscriptions and lifecycle concerns.
-- Store owns auth state transitions and auth actions.
-- Router owns navigation policy and access control.
-
-This separation makes the boilerplate easier to port into other projects with minimal coupling.
+Developed by [jvmbeck](https://github.com/jvmbeck).

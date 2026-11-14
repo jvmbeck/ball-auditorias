@@ -66,6 +66,7 @@ export default boot(() => {
 
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
     const identity = user ? `uid=${user.uid}` : 'no authenticated user';
+
     logAuth(`Listener #${listenerId} fired: ${identity}.`);
 
     await authStore.syncAuthState(user);

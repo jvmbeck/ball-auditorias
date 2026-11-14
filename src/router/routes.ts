@@ -49,6 +49,18 @@ const routes: RouteRecordRaw[] = [
     children: [{ path: '', name: 'login', component: () => import('pages/LoginPage.vue') }],
     meta: { guestOnly: true },
   },
+  {
+    path: '/access-error',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'access-error',
+        component: () => import('pages/AccessErrorPage.vue'),
+      },
+    ],
+    meta: { public: true },
+  },
 
   // Always leave this as last one,
   // but you can also remove it

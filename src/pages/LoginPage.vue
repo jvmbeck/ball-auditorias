@@ -66,33 +66,26 @@ const loading = ref(false);
 const resolvingAccess = ref(false);
 const errorMessage = ref<string | null>(null);
 
-const waitForRoleResolution = async (timeoutMs = 3000) => {
-  const startedAt = Date.now();
-
-  while (!authStore.role && Date.now() - startedAt < timeoutMs) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-};
-
 async function handleLogin() {
   loading.value = true;
   resolvingAccess.value = false;
   errorMessage.value = null;
 
   try {
+    // This now waits for Firebase's listener and profile resolution.
     await authStore.loginUser(email.value, password.value);
-    resolvingAccess.value = true;
-    await waitForRoleResolution();
 
-    // Role can be resolved asynchronously by the auth state listener.
-    const destination = authStore.role === 'admin' ? '/admin' : '/auditor';
-    void router.push(destination);
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      errorMessage.value = err.message;
+    resolvingAccess.value = true;
+
+    if (authStore.role === 'admin') {
+      await router.push('/admin');
+    } else if (authStore.role === 'operator') {
+      await router.push('/auditor');
     } else {
-      errorMessage.value = 'Falha ao fazer login.';
+      errorMessage.value = 'Seu usuário não possui um perfil de acesso válido.';
     }
+  } catch (err: unknown) {
+    errorMessage.value = err instanceof Error ? err.message : 'Falha ao fazer login.';
   } finally {
     loading.value = false;
     resolvingAccess.value = false;
